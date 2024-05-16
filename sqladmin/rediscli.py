@@ -2,7 +2,7 @@
 Base structure is from the Flask-Admin project.
 """
 import shlex
-from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Tuple, Union
 
 from starlette.requests import Request
 from starlette.responses import Response
@@ -18,8 +18,49 @@ class TextWrapper(str):
     pass
 
 
-class RedisCLI(BaseView):
-    """Base class for Redis CLI."""
+class RedisCLIView(BaseView):
+    """Base class for Redis CLI.
+
+    ???+ usage
+        ```python
+        from redis import Redis
+        from starlette.applications import Starlette
+
+        from sqladmin import Admin
+        from sqladmin.rediscli import RedisCLIView
+
+        redis = Redis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            db=REDIS_DB,
+            username=REDIS_USERNAME,
+            password=REDIS_PASSWORD,
+            decode_responses=True,
+        )
+
+
+        class RedisCLI(RedisCLIView):
+            redis = redis
+
+
+        app = Starlette()
+        admin = Admin(app)
+        admin.add_view(RedisCLI)
+        # uvicorn main:app --reload
+
+        ```
+    """
+
+    name: ClassVar[str] = "Redis CLI"
+    """Name of the view to be displayed."""
+
+    identity: ClassVar[str] = "rediscli"
+    """Same as name but it will be used for URL of the endpoints."""
+
+    methods: ClassVar[List[str]] = ["GET", "POST"]
+    """List of method names for the endpoint.
+    By default it's set to `["GET", "POST"]` only.
+    """
 
     remapped_commands = {"del": "delete"}
     """List of redis remapped commands."""
@@ -27,12 +68,11 @@ class RedisCLI(BaseView):
     excluded_commands = set(("pubsub", "set_response_callback", "from_url"))
     """List of excluded commands."""
 
-    def __init__(self, redis: Redis) -> None:
-        """
-        Args:
-            redis: Redis connection object.
-        """
-        self.redis = redis
+    redis: "Redis"
+
+    def __init__(self) -> None:
+        if not self.redis:
+            raise ValueError("Redis connection is not provided.")
         self.commands: Dict[str, Tuple[Callable[..., Any], str]] = {}
 
         self._inspect_commands()
@@ -143,7 +183,7 @@ class RedisCLI(BaseView):
             result: Command result.
         """
 
-    @expose("/", methods=["GET", "POST"], identity="rediscli")
+    @expose("/", methods=["GET", "POST"])
     async def index(self, request: Request) -> Response:
         """Render the Redis CLI."""
         if request.method == "GET":
