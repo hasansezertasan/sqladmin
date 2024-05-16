@@ -39,6 +39,9 @@ dynamic = ["version"]
 full = [
     "itsdangerous",
 ]
+redis = [
+    "redis",
+]
 
 [project.urls]
 Documentation = "https://aminalaee.dev/sqladmin"
@@ -87,6 +90,7 @@ python = ["38", "39", "310", "311", "3.12"]
 [tool.hatch.envs.lint]
 dependencies = [
   "mypy==1.8.0",
+  "types-redis",
   "ruff==0.1.5",
   "sqlalchemy~=1.4", # MyPy issues with SQLAlchemy V2
 ]
@@ -107,13 +111,13 @@ test = "coverage run -a --concurrency=thread,greenlet -m pytest {args}"
 
 [tool.hatch.envs.lint.scripts]
 check = [
-  "ruff .",
+  "ruff check .",
   "ruff format --check .",
   "mypy sqladmin",
 ]
 format = [
   "ruff format .",
-  "ruff --fix .",
+  "ruff check --fix .",
 ]
 
 [tool.hatch.envs.docs.scripts]
