@@ -58,65 +58,6 @@ class RedisCLI(BaseView):
         """Contribute custom commands."""
         self.commands["help"] = (self._cmd_help, "Help!")
 
-    async def _execute_command(
-        self, request: Request, name: str, args: Tuple[str, ...]
-    ) -> Response:
-        """
-        Execute single command.
-
-        Args:
-            name: Command name.
-            args: Command arguments.
-        """
-        new_cmd = self.remapped_commands.get(name)
-        if new_cmd:
-            name = new_cmd
-
-        if name not in self.commands:
-            return await self._error(request, "CLI: Invalid command.")
-
-        handler, _ = self.commands[name]
-        return await self._result(request, handler(*args))
-
-    def _parse_cmd(self, cmd: str) -> tuple:
-        """
-        Parse command by using shlex module.
-
-        Args:
-            cmd: Command to parse.
-        """
-        return tuple(shlex.split(cmd))
-
-    async def _error(self, request: Request, msg: str) -> Response:
-        """
-        Format error message as HTTP response.
-
-        Args:
-            msg: Message to format.
-        """
-        return await self.templates.TemplateResponse(
-            request,
-            "admin/rediscli/error.html",
-            context={"error": msg},
-        )
-
-    async def _result(
-        self,
-        request: Request,
-        result: Union[tuple | list | bool | str | bytes | TextWrapper | dict],
-    ) -> Response:
-        """
-        Format result message as HTTP response.
-
-        :param msg:
-            Result to format.
-        """
-        return await self.templates.TemplateResponse(
-            request,
-            "admin/rediscli/response.html",
-            context={"type_name": lambda d: type(d).__name__, "result": result},
-        )
-
     def _cmd_help(self, *args: Any) -> TextWrapper:
         """
         Help command implementation.
@@ -136,6 +77,72 @@ class RedisCLI(BaseView):
 
         return TextWrapper(help)
 
+    def _parse_cmd(self, cmd: str) -> tuple:
+        """
+        Parse command by using shlex module.
+
+        Args:
+            cmd: Command to parse.
+        """
+        return tuple(shlex.split(cmd))
+
+    async def _execute_command(
+        self, request: Request, name: str, args: Tuple[str, ...]
+    ) -> Union[tuple | list | bool | str | bytes | TextWrapper | dict]:
+        """
+        Execute single command.
+
+        Args:
+            name: Command name.
+            args: Command arguments.
+        """
+        new_cmd = self.remapped_commands.get(name)
+        if new_cmd:
+            name = new_cmd
+
+        if name not in self.commands:
+            raise KeyError("Invalid command.")
+
+        handler, _ = self.commands[name]
+        return handler(*args)
+
+    async def _error(self, request: Request, msg: str) -> Response:
+        """
+        Format error message as HTTP response.
+
+        Args:
+            msg: Message to format.
+        """
+        return await self.templates.TemplateResponse(
+            request,
+            "admin/rediscli/error.html",
+            context={"error": msg},
+        )
+
+    async def before_execution(self, request: Request, parts: Tuple[str, ...]) -> None:
+        """Perform some actions before the command execution.
+        By default, does nothing.
+
+        Args:
+            request: Incoming request.
+            parts: Command parts.
+        """
+
+    async def after_execution(
+        self,
+        request: Request,
+        parts: Tuple[str, ...],
+        result: Union[tuple | list | bool | str | bytes | TextWrapper | dict],
+    ) -> None:
+        """Perform some actions after the command execution.
+        By default, does nothing.
+
+        Args:
+            request: Incoming request.
+            parts: Command parts.
+            result: Command result.
+        """
+
     @expose("/", methods=["GET", "POST"], identity="rediscli")
     async def index(self, request: Request) -> Response:
         """Render the Redis CLI."""
@@ -153,7 +160,14 @@ class RedisCLI(BaseView):
             if not parts:
                 return await self._error(request, "CLI: Failed to parse command.")
 
-            return await self._execute_command(request, parts[0], parts[1:])
+            await self.before_execution(request, parts)
+            result = await self._execute_command(request, parts[0], parts[1:])
+            await self.after_execution(request, parts, result)
+            return await self.templates.TemplateResponse(
+                request,
+                "admin/rediscli/response.html",
+                context={"type_name": lambda d: type(d).__name__, "result": result},
+            )
         except Exception as e:
             msg = f"CLI: {e}"
             return await self._error(request, msg)
