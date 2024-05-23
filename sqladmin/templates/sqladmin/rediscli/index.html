@@ -1,6 +1,7 @@
 {% extends "sqladmin/layout.html" %}
 {% block head %}
-<script type="text/javascript" src="{{ url_for('admin:statics', path='js/htmx.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('admin:statics', path='js/htmx.min.js') }}"></script>
 {% endblock head %}
 {% block content %}
+{{ url_for('admin:rediscli') }}
 {% endblock content %}

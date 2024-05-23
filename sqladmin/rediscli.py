@@ -1,6 +1,7 @@
 """
 Base structure is from the Flask-Admin project.
 """
+
 import shlex
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Tuple, Union
 
@@ -47,7 +48,6 @@ class RedisCLIView(BaseView):
         admin = Admin(app)
         admin.add_view(RedisCLI)
         # uvicorn main:app --reload
-
         ```
     """
 
@@ -86,7 +86,7 @@ class RedisCLIView(BaseView):
             if name.startswith("_"):
                 continue
             attr = getattr(self.redis, name)
-            if not callable(attr) and name in self.remapped_commands:
+            if not callable(attr) and name in self.excluded_commands:
                 continue
             doc = (getattr(attr, "__doc__", "") or "").strip()
             self.commands[name] = (attr, doc)
@@ -128,11 +128,12 @@ class RedisCLIView(BaseView):
 
     async def _execute_command(
         self, request: Request, name: str, args: Tuple[str, ...]
-    ) -> Union[tuple | list | bool | str | bytes | TextWrapper | dict]:
+    ) -> Union[tuple, list, bool, str, bytes, TextWrapper, dict]:
         """
         Execute single command.
 
         Args:
+            request: Incoming request.
             name: Command name.
             args: Command arguments.
         """
@@ -159,36 +160,60 @@ class RedisCLIView(BaseView):
             context={"error": msg},
         )
 
-    async def before_execution(self, request: Request, parts: Tuple[str, ...]) -> None:
+    async def before_execution(
+        self,
+        request: Request,
+        name: str,
+        args: Tuple[str, ...],
+    ) -> None:
         """Perform some actions before the command execution.
         By default, does nothing.
 
         Args:
             request: Incoming request.
-            parts: Command parts.
+            name: Command name.
+            args: Command arguments.
         """
 
     async def after_execution(
         self,
         request: Request,
-        parts: Tuple[str, ...],
-        result: Union[tuple | list | bool | str | bytes | TextWrapper | dict],
+        name: str,
+        args: Tuple[str, ...],
+        result: Union[tuple, list, bool, str, bytes, TextWrapper, dict],
     ) -> None:
         """Perform some actions after the command execution.
         By default, does nothing.
 
         Args:
             request: Incoming request.
-            parts: Command parts.
+            name: Command name.
+            args: Command arguments.
             result: Command result.
         """
 
-    @expose("/", methods=["GET", "POST"])
-    async def index(self, request: Request) -> Response:
+    async def can_use_command(
+        self,
+        request: Request,
+        name: str,
+        args: Tuple[str, ...],
+    ) -> bool:
+        """Check if user can use the command.
+        By default, always returns True.
+
+        Args:
+            request: Incoming request.
+            name: Command name.
+            args: Command arguments.
+        """
+        return True
+
+    @expose("/rediscli", methods=["GET", "POST"], identity="rediscli")
+    async def index_page(self, request: Request) -> Response:
         """Render the Redis CLI."""
         if request.method == "GET":
             return await self.templates.TemplateResponse(
-                request, "sqladmin/rediscli/index.html"
+                request, "sqladmin/rediscli/index.html", context={"request": request}
             )
         try:
             form = await request.form()
@@ -200,9 +225,13 @@ class RedisCLIView(BaseView):
             if not parts:
                 return await self._error(request, "CLI: Failed to parse command.")
 
-            await self.before_execution(request, parts)
-            result = await self._execute_command(request, parts[0], parts[1:])
-            await self.after_execution(request, parts, result)
+            cmd_name = parts[0]
+            cmd_args = parts[1:]
+            await self.before_execution(request, cmd_name, cmd_args)
+            if not await self.can_use_command(request, cmd_name, cmd_args):
+                return await self._error(request, "CLI: Command is not allowed.")
+            result = await self._execute_command(request, cmd_name, cmd_args)
+            await self.after_execution(request, cmd_name, cmd_args, result)
             return await self.templates.TemplateResponse(
                 request,
                 "admin/rediscli/response.html",
