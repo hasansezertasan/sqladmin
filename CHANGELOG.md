@@ -4,6 +4,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 0.21.0 - 2025-07-02
+
+### Added
+* Add `category_icon` by @sheldygg in https://github.com/aminalaee/sqladmin/pull/848
+* Add model convertors docs by @Vasiliy566 in https://github.com/aminalaee/sqladmin/pull/883
+* Allow custom response in authentication logout by @joschnitzbauer in https://github.com/aminalaee/sqladmin/pull/914
+* ModelView @expose decorator support by @foarsitter in https://github.com/aminalaee/sqladmin/pull/881
+* Adding the ability to add filters to model views by @lorg in https://github.com/aminalaee/sqladmin/pull/906
+* Details page query by @wray27 in https://github.com/aminalaee/sqladmin/pull/929
+* export csv/json in `utf-8` by @alserious in https://github.com/aminalaee/sqladmin/pull/911
+* Indicate Required Fields with a Red Asterisk by @maxim-f1 in https://github.com/aminalaee/sqladmin/pull/880
+
+### Fixed
+* Update hatch command in CONTRIBUTING.md by @foarsitter in https://github.com/aminalaee/sqladmin/pull/882
+* fix: CategoryMenu is_active logic by @retromechs in https://github.com/aminalaee/sqladmin/pull/920
+* Doc update - Related model name by @wnowicki in https://github.com/aminalaee/sqladmin/pull/917
+* docs: Added model context, fixed syntax by @sreyemnayr in https://github.com/aminalaee/sqladmin/pull/930
+
+**Full Changelog**: https://github.com/aminalaee/sqladmin/compare/0.20.1...0.21.0
+
+## Version 0.20.1 - 2024-10-28
+
+### Fixed
+
+* Fix export json related model by @Vasiliy566 in https://github.com/aminalaee/sqladmin/pull/837
+* Fix JSON export trailing comma by @jbrendel in https://github.com/aminalaee/sqladmin/pull/843
+
+**Full Changelog**: https://github.com/aminalaee/sqladmin/compare/0.20.0...0.20.1
+
+## Version 0.20.0 - 2024-10-17
+
+### Added
+* add json export format. by @Vasiliy566 in https://github.com/aminalaee/sqladmin/pull/829
+
+### Fixed
+* clamp page if it exceeds the maximum page by @alex-lambdaloopers in https://github.com/aminalaee/sqladmin/pull/814
+
+## New Contributors
+* @Vasiliy566 made their first contribution in https://github.com/aminalaee/sqladmin/pull/829
+
+**Full Changelog**: https://github.com/aminalaee/sqladmin/compare/0.19.0...0.20.0
+
+## Version 0.19.0 - 2024-09-06
+
+### Added
+* Add favicon by @sheldygg in https://github.com/aminalaee/sqladmin/pull/787
+* Add tabler icons by @r-m-n in https://github.com/aminalaee/sqladmin/pull/795
+* feat: use favicon_url instead of logo_url for favicon by @alex-lambdaloopers in https://github.com/aminalaee/sqladmin/pull/800
+* Allow multiple ajax sorts and changes to result size by @mfriedy in https://github.com/aminalaee/sqladmin/pull/805
+
+### Fixed
+* Fix column_property by @aminalaee in https://github.com/aminalaee/sqladmin/pull/791
+* Fix page number issue when changing page size by @numberbee7070 in https://github.com/aminalaee/sqladmin/pull/782
+* Document update to resolve DeprecationWarning from Starlette (#809) by @a4rcvv in https://github.com/aminalaee/sqladmin/pull/810
+* Bug fix: unhandled exception during AjaxSelect load by @diskream in https://github.com/aminalaee/sqladmin/pull/727
+
+**Full Changelog**: https://github.com/aminalaee/sqladmin/compare/0.18.0...0.19.0
+
+## Version 0.18.0 - 2024-07-01
+
+### Added
+
+* Add `form_rules`, `form_create_rules`, `form_edit_rules` by @aminalaee in https://github.com/aminalaee/sqladmin/pull/779
+* Add more docs for overriding default tempates by @jonocodes in https://github.com/aminalaee/sqladmin/pull/769
+
+### Fixed
+* Fix edit_form_query documentation example by @lukeclimen in https://github.com/aminalaee/sqladmin/pull/777
+
+**Full Changelog**: https://github.com/aminalaee/sqladmin/compare/0.17.0...0.18.0
+
 ## Version 0.17.0 - 2024-05-13
 
 ### Added

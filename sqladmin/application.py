@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import io
 import logging
@@ -7,12 +9,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    List,
-    Optional,
     Sequence,
-    Tuple,
-    Type,
-    Union,
     cast,
     no_type_check,
 )
@@ -66,14 +63,15 @@ class BaseAdmin:
     def __init__(
         self,
         app: Starlette,
-        engine: Optional[ENGINE_TYPE] = None,
-        session_maker: Optional[sessionmaker] = None,
+        engine: ENGINE_TYPE | None = None,
+        session_maker: sessionmaker | None = None,
         base_url: str = "/admin",
         title: str = "Admin",
-        logo_url: Optional[str] = None,
+        logo_url: str | None = None,
+        favicon_url: str | None = None,
         templates_dir: str = "templates",
-        middlewares: Optional[Sequence[Middleware]] = None,
-        authentication_backend: Optional[AuthenticationBackend] = None,
+        middlewares: Sequence[Middleware] | None = None,
+        authentication_backend: AuthenticationBackend | None = None,
     ) -> None:
         self.app = app
         self.engine = engine
@@ -81,6 +79,7 @@ class BaseAdmin:
         self.templates_dir = templates_dir
         self.title = title
         self.logo_url = logo_url
+        self.favicon_url = favicon_url
 
         if session_maker:
             self.session_maker = session_maker
@@ -100,7 +99,7 @@ class BaseAdmin:
 
         self.admin = Starlette(middleware=middlewares)
         self.templates = self.init_templating_engine()
-        self._views: List[Union[BaseView, ModelView]] = []
+        self._views: list[BaseView | ModelView] = []
         self._menu = Menu()
 
     def init_templating_engine(self) -> Jinja2Templates:
@@ -120,7 +119,7 @@ class BaseAdmin:
         return templates
 
     @property
-    def views(self) -> List[Union[BaseView, ModelView]]:
+    def views(self) -> list[BaseView | ModelView]:
         """Get list of ModelView and BaseView instances lazily.
 
         Returns:
@@ -136,7 +135,7 @@ class BaseAdmin:
 
         raise HTTPException(status_code=404)
 
-    def add_view(self, view: Union[Type[ModelView], Type[BaseView]]) -> None:
+    def add_view(self, view: type[ModelView] | type[BaseView]) -> None:
         """Add ModelView or BaseView classes to Admin.
         This is a shortcut that will handle both `add_model_view` and `add_base_view`.
         """
@@ -149,10 +148,10 @@ class BaseAdmin:
 
     def _find_decorated_funcs(
         self,
-        view: Type[Union[BaseView, ModelView]],
-        view_instance: Union[BaseView, ModelView],
+        view: type[BaseView | ModelView],
+        view_instance: BaseView | ModelView,
         handle_fn: Callable[
-            [MethodType, Type[Union[BaseView, ModelView]], Union[BaseView, ModelView]],
+            [MethodType, type[BaseView | ModelView], BaseView | ModelView],
             None,
         ],
     ) -> None:
@@ -164,8 +163,8 @@ class BaseAdmin:
     def _handle_action_decorated_func(
         self,
         func: MethodType,
-        view: Type[Union[BaseView, ModelView]],
-        view_instance: Union[BaseView, ModelView],
+        view: type[BaseView | ModelView],
+        view_instance: BaseView | ModelView,
     ) -> None:
         if hasattr(func, "_action"):
             view_instance = cast(ModelView, view_instance)
@@ -194,21 +193,27 @@ class BaseAdmin:
     def _handle_expose_decorated_func(
         self,
         func: MethodType,
-        view: Type[Union[BaseView, ModelView]],
-        view_instance: Union[BaseView, ModelView],
+        view: type[BaseView | ModelView],
+        view_instance: BaseView | ModelView,
     ) -> None:
         if hasattr(func, "_exposed"):
+            if view.is_model:
+                path = f"/{view_instance.identity}" + getattr(func, "_path")
+                name = f"view-{view_instance.identity}-{func.__name__}"
+            else:
+                view.identity = getattr(func, "_identity")
+                path = getattr(func, "_path")
+                name = getattr(func, "_identity")
+
             self.admin.add_route(
                 route=func,
-                path=getattr(func, "_path"),
+                path=path,
                 methods=getattr(func, "_methods"),
-                name=getattr(func, "_identity"),
+                name=name,
                 include_in_schema=getattr(func, "_include_in_schema"),
             )
 
-            view.identity = getattr(func, "_identity")
-
-    def add_model_view(self, view: Type[ModelView]) -> None:
+    def add_model_view(self, view: type[ModelView]) -> None:
         """Add ModelView to the Admin.
 
         ???+ usage
@@ -234,10 +239,15 @@ class BaseAdmin:
         self._find_decorated_funcs(
             view, view_instance, self._handle_action_decorated_func
         )
+
+        self._find_decorated_funcs(
+            view, view_instance, self._handle_expose_decorated_func
+        )
+
         self._views.append(view_instance)
         self._build_menu(view_instance)
 
-    def add_base_view(self, view: Type[BaseView]) -> None:
+    def add_base_view(self, view: type[BaseView]) -> None:
         """Add BaseView to the Admin.
 
         ???+ usage
@@ -265,9 +275,9 @@ class BaseAdmin:
         self._views.append(view_instance)
         self._build_menu(view_instance)
 
-    def _build_menu(self, view: Union[ModelView, BaseView]) -> None:
+    def _build_menu(self, view: ModelView | BaseView) -> None:
         if view.category:
-            menu = CategoryMenu(name=view.category)
+            menu = CategoryMenu(name=view.category, icon=view.category_icon)
             menu.add_child(ViewMenu(view=view, name=view.name, icon=view.icon))
             self._menu.add(menu)
         else:
@@ -338,15 +348,16 @@ class Admin(BaseAdminView):
     def __init__(
         self,
         app: Starlette,
-        engine: Optional[ENGINE_TYPE] = None,
-        session_maker: Optional[Union[sessionmaker, "async_sessionmaker"]] = None,
+        engine: ENGINE_TYPE | None = None,
+        session_maker: sessionmaker | "async_sessionmaker" | None = None,
         base_url: str = "/admin",
         title: str = "Admin",
-        logo_url: Optional[str] = None,
-        middlewares: Optional[Sequence[Middleware]] = None,
+        logo_url: str | None = None,
+        favicon_url: str | None = None,
+        middlewares: Sequence[Middleware] | None = None,
         debug: bool = False,
         templates_dir: str = "templates",
-        authentication_backend: Optional[AuthenticationBackend] = None,
+        authentication_backend: AuthenticationBackend | None = None,
     ) -> None:
         """
         Args:
@@ -356,6 +367,7 @@ class Admin(BaseAdminView):
             base_url: Base URL for Admin interface.
             title: Admin title.
             logo_url: URL of logo to be displayed instead of title.
+            favicon_url: URL of favicon to be displayed.
         """
 
         super().__init__(
@@ -365,6 +377,7 @@ class Admin(BaseAdminView):
             base_url=base_url,
             title=title,
             logo_url=logo_url,
+            favicon_url=favicon_url,
             templates_dir=templates_dir,
             middlewares=middlewares,
             authentication_backend=authentication_backend,
@@ -374,7 +387,7 @@ class Admin(BaseAdminView):
 
         async def http_exception(
             request: Request, exc: Exception
-        ) -> Union[Response, Awaitable[Response]]:
+        ) -> Response | Awaitable[Response]:
             assert isinstance(exc, HTTPException)
             context = {
                 "status_code": exc.status_code,
@@ -440,12 +453,13 @@ class Admin(BaseAdminView):
         pagination = await model_view.list(request)
         pagination.add_pagination_urls(request.url)
 
-        if (
-            pagination.page * pagination.page_size
-            > pagination.count + pagination.page_size
-        ):
-            raise HTTPException(
-                status_code=400, detail="Invalid page or pageSize parameter"
+        request_page = model_view.validate_page_number(
+            request.query_params.get("page"), 1
+        )
+
+        if request_page > pagination.page:
+            return RedirectResponse(
+                request.url.include_query_params(page=pagination.page), status_code=302
             )
 
         context = {"model_view": model_view, "pagination": pagination}
@@ -458,10 +472,9 @@ class Admin(BaseAdminView):
         """Details route."""
 
         await self._details(request)
-
         model_view = self._find_model_view(request.path_params["identity"])
+        model = await model_view.get_object_for_details(request)
 
-        model = await model_view.get_object_for_details(request.path_params["pk"])
         if not model:
             raise HTTPException(status_code=404)
 
@@ -508,7 +521,7 @@ class Admin(BaseAdminView):
         identity = request.path_params["identity"]
         model_view = self._find_model_view(identity)
 
-        Form = await model_view.scaffold_form()
+        Form = await model_view.scaffold_form(model_view._form_create_rules)
         form_data = await self._handle_form_data(request)
         form = Form(form_data)
 
@@ -558,7 +571,7 @@ class Admin(BaseAdminView):
         if not model:
             raise HTTPException(status_code=404)
 
-        Form = await model_view.scaffold_form()
+        Form = await model_view.scaffold_form(model_view._form_edit_rules)
         context = {
             "obj": model,
             "model_view": model_view,
@@ -635,7 +648,11 @@ class Admin(BaseAdminView):
     async def logout(self, request: Request) -> Response:
         assert self.authentication_backend is not None
 
-        await self.authentication_backend.logout(request)
+        response = await self.authentication_backend.logout(request)
+
+        if isinstance(response, Response):
+            return response
+
         return RedirectResponse(request.url_for("admin:index"), status_code=302)
 
     async def ajax_lookup(self, request: Request) -> Response:
@@ -660,7 +677,7 @@ class Admin(BaseAdminView):
 
     def get_save_redirect_url(
         self, request: Request, form: FormData, model_view: ModelView, obj: Any
-    ) -> Union[str, URL]:
+    ) -> str | URL:
         """
         Get the redirect URL after a save action
         which is triggered from create/edit page.
@@ -685,7 +702,7 @@ class Admin(BaseAdminView):
         """
 
         form = await request.form()
-        form_data: List[Tuple[str, Union[str, UploadFile]]] = []
+        form_data: list[tuple[str, str | UploadFile]] = []
         for key, value in form.multi_items():
             if not isinstance(value, UploadFile):
                 form_data.append((key, value))
@@ -726,8 +743,8 @@ class Admin(BaseAdminView):
 def expose(
     path: str,
     *,
-    methods: List[str] = ["GET"],
-    identity: Optional[str] = None,
+    methods: list[str] = ["GET"],
+    identity: str | None = None,
     include_in_schema: bool = True,
 ) -> Callable[..., Any]:
     """Expose View with information."""
@@ -746,8 +763,8 @@ def expose(
 
 def action(
     name: str,
-    label: Optional[str] = None,
-    confirmation_message: Optional[str] = None,
+    label: str | None = None,
+    confirmation_message: str | None = None,
     *,
     include_in_schema: bool = True,
     add_in_detail: bool = True,

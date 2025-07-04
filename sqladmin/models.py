@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+import json
 import time
+import warnings
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -29,9 +33,10 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 from wtforms import Field, Form
+from wtforms.fields.core import UnboundField
 
 from sqladmin._queries import Query
-from sqladmin._types import MODEL_ATTR
+from sqladmin._types import MODEL_ATTR, ColumnFilter
 from sqladmin.ajax import create_ajax_loader
 from sqladmin.exceptions import InvalidModelError
 from sqladmin.formatters import BASE_FORMATTERS
@@ -172,11 +177,14 @@ class BaseView(BaseModelView):
 
     icon: ClassVar[str] = ""
     """Display icon for ModelAdmin in the sidebar.
-    Currently only supports FontAwesome icons.
+    Currently only supports FontAwesome and Tabler icons.
     """
 
     category: ClassVar[str] = ""
     """Category name to group views together."""
+
+    category_icon: ClassVar[str] = ""
+    """Display icon for category in the sidebar."""
 
 
 class ModelView(BaseView, metaclass=ModelViewMeta):
@@ -307,6 +315,17 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         ```
     """
 
+    column_filters: ClassVar[Sequence[ColumnFilter]] = []
+    """Collection of the filterable columns for the list view.
+    Columns can either be string names or SQLAlchemy columns.
+
+    ???+ example
+        ```python
+        class UserAdmin(ModelView, model=User):
+            column_filters = [User.is_admin]
+        ```
+    """
+
     column_sortable_list: ClassVar[Sequence[MODEL_ATTR]] = []
     """Collection of the sortable columns for the list view.
 
@@ -393,21 +412,21 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     """
 
     save_as: ClassVar[bool] = False
-    """Set `save_as` to enable a “save as new” feature on admin change forms.
+    """Set `save_as` to enable a "save as new" feature on admin change forms.
 
     Normally, objects have three save options:
     ``Save`, `Save and continue editing` and `Save and add another`.
 
-    If save_as is True, `Save and add another` will be replaced 
-    by a `Save as new` button 
-    that creates a new object (with a new ID) 
+    If save_as is True, `Save and add another` will be replaced
+    by a `Save as new` button
+    that creates a new object (with a new ID)
     rather than updating the existing object.
 
     By default, `save_as` is set to `False`.
     """
 
     save_as_continue: ClassVar[bool] = True
-    """When `save_as=True`, the default redirect after saving the new object 
+    """When `save_as=True`, the default redirect after saving the new object
     is to the edit view for that object.
     If you set `save_as_continue=False`, the redirect will be to the list view.
 
@@ -426,6 +445,12 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
     edit_template: ClassVar[str] = "sqladmin/edit.html"
     """Edit view template. Default is `sqladmin/edit.html`."""
+
+    # Template configuration
+    show_compact_lists: ClassVar[bool] = True
+    """Show compact lists. Default is `True`. 
+    If False, when showing lists of objects, each object will be \
+    displayed in a separate line."""
 
     # Export
     column_export_list: ClassVar[List[MODEL_ATTR]] = []
@@ -450,7 +475,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         ```
     """
 
-    export_types: ClassVar[List[str]] = ["csv"]
+    export_types: ClassVar[List[str]] = ["csv", "json"]
     """A list of available export filetypes.
     Currently only `csv` is supported.
     """
@@ -598,6 +623,28 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         ```
     """
 
+    form_rules: ClassVar[list[str]] = []
+    """List of rendering rules for model creation and edit form.
+    This property changes default form rendering behavior and to rearrange
+    order of rendered fields, add some text between fields, group them, etc.
+    If not set, will use default Flask-Admin form rendering logic.
+
+    ???+ example
+        ```python
+        class UserAdmin(ModelAdmin, model=User):
+            form_rules = [
+                "first_name",
+                "last_name",
+            ]
+        ```
+    """
+
+    form_create_rules: ClassVar[list[str]] = []
+    """Customized rules for the create form. Cannot be specified with `form_rules`."""
+
+    form_edit_rules: ClassVar[list[str]] = []
+    """Customized rules for the edit form. Cannot be specified with `form_rules`."""
+
     # General options
     column_labels: ClassVar[Dict[MODEL_ATTR, str]] = {}
     """A mapping of column labels, used to map column names to new names.
@@ -618,7 +665,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         - None will be displayed as an empty string
         - bool will be displayed as a checkmark if it is True otherwise as an X.
 
-    If you don’t like the default behavior and don’t want any type formatters applied,
+    If you don't like the default behavior and don't want any type formatters applied,
     just override this property with an empty dictionary:
 
     ???+ example
@@ -685,9 +732,24 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
                 model_admin=self, name=name, options=options
             )
 
+        self._refresh_form_rules_cache()
+
         self._custom_actions_in_list: Dict[str, str] = {}
         self._custom_actions_in_detail: Dict[str, str] = {}
         self._custom_actions_confirmation: Dict[str, str] = {}
+
+    def _run_arbitrary_query_sync(self, stmt: ClauseElement) -> Any:
+        with self.session_maker(expire_on_commit=False) as session:
+            result = session.execute(stmt)
+            return result.all()
+
+    async def _run_arbitrary_query(self, stmt: ClauseElement) -> Any:
+        if self.is_async:
+            async with self.session_maker(expire_on_commit=False) as session:
+                result = await session.execute(stmt)
+                return result.all()
+        else:
+            return self._run_arbitrary_query_sync(stmt)
 
     def _run_query_sync(self, stmt: ClauseElement) -> Any:
         with self.session_maker(expire_on_commit=False) as session:
@@ -774,6 +836,12 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         for relation in self._list_relations:
             stmt = stmt.options(selectinload(relation))
 
+        for filter in self.get_filters():
+            if request.query_params.get(filter.parameter_name):
+                stmt = await filter.get_filtered_query(
+                    stmt, request.query_params.get(filter.parameter_name), self.model
+                )
+
         stmt = self.sort_query(stmt, request)
 
         if search:
@@ -811,16 +879,12 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         rows = await self._run_query(stmt)
         return rows[0] if rows else None
 
-    async def get_object_for_details(self, value: Any) -> Any:
-        stmt = self._stmt_by_identifier(value)
-
-        for relation in self._details_relations:
-            stmt = stmt.options(selectinload(relation))
-
+    async def get_object_for_details(self, request: Request) -> Any:
+        stmt = self.details_query(request)
         return await self._get_object_by_pk(stmt)
 
     async def get_object_for_edit(self, request: Request) -> Any:
-        stmt = self.edit_form_query(request)
+        stmt = self.form_edit_query(request)
         return await self._get_object_by_pk(stmt)
 
     async def get_object_for_delete(self, value: Any) -> Any:
@@ -944,6 +1008,15 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
             defaults=self._list_prop_names,
         )
 
+    def get_filters(self) -> List[ColumnFilter]:
+        """Get list of filters."""
+
+        filters = getattr(self, "column_filters", None)
+        if not filters:
+            return []
+
+        return filters
+
     async def on_model_change(
         self, data: dict, model: Any, is_created: bool, request: Request
     ) -> None:
@@ -987,10 +1060,11 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         By default do nothing.
         """
 
-    async def scaffold_form(self) -> Type[Form]:
+    async def scaffold_form(self, rules: List[str] | None = None) -> Type[Form]:
         if self.form is not None:
             return self.form
-        return await get_model_form(
+
+        form = await get_model_form(
             model=self.model,
             session_maker=self.session_maker,
             only=self._form_prop_names,
@@ -1003,6 +1077,11 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
             form_include_pk=self.form_include_pk,
             form_converter=self.form_converter,
         )
+
+        if rules:
+            self._validate_form_class(rules, form)
+
+        return form
 
     def search_placeholder(self) -> str:
         """Return search placeholder text.
@@ -1053,7 +1132,22 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
         return select(self.model)
 
+    def details_query(self, request: Request) -> Select:
+        """
+        The SQLAlchemy select expression used for the details page which can be
+        customized. By default it will select all objects without any filters.
+        """
+
+        return self.form_edit_query(request)
+
     def edit_form_query(self, request: Request) -> Select:
+        msg = (
+            "Overriding 'edit_form_query' is deprecated. Use 'form_edit_query' instead."
+        )
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+        return self.form_edit_query(request)
+
+    def form_edit_query(self, request: Request) -> Select:
         """
         The SQLAlchemy select expression used for the edit form page which can be
         customized. By default it will select the object by primary key(s) without any
@@ -1117,7 +1211,9 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     ) -> StreamingResponse:
         if export_type == "csv":
             return await self._export_csv(data)
-        raise NotImplementedError("Only export_type='csv' is implemented.")
+        elif export_type == "json":
+            return await self._export_json(data)
+        raise NotImplementedError("Only export_type='csv' or 'json' is implemented.")
 
     async def _export_csv(
         self,
@@ -1140,6 +1236,57 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
         return StreamingResponse(
             content=stream_to_csv(generate),
-            media_type="text/csv",
+            media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f"attachment;filename={filename}"},
         )
+
+    async def _export_json(
+        self,
+        data: List[Any],
+    ) -> StreamingResponse:
+        async def generate() -> AsyncGenerator[str, None]:
+            yield "["
+            len_data = len(data)
+            last_idx = len_data - 1
+            separator = "," if len_data > 1 else ""
+
+            for idx, row in enumerate(data):
+                row_dict = {
+                    name: str(await self.get_prop_value(row, name))
+                    for name in self._export_prop_names
+                }
+                yield json.dumps(row_dict, ensure_ascii=False) + (
+                    separator if idx < last_idx else ""
+                )
+
+            yield "]"
+
+        filename = secure_filename(self.get_export_name(export_type="json"))
+        return StreamingResponse(
+            content=generate(),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment;filename={filename}"},
+        )
+
+    def _refresh_form_rules_cache(self) -> None:
+        if self.form_rules:
+            self._form_create_rules = self.form_rules
+            self._form_edit_rules = self.form_rules
+        else:
+            self._form_create_rules = self.form_create_rules
+            self._form_edit_rules = self.form_edit_rules
+
+    def _validate_form_class(self, ruleset: List[Any], form_class: Type[Form]) -> None:
+        form_fields = []
+        for name, obj in form_class.__dict__.items():
+            if isinstance(obj, UnboundField):
+                form_fields.append(name)
+
+        missing_fields = []
+        if ruleset:
+            for field_name in form_fields:
+                if field_name not in ruleset:
+                    missing_fields.append(field_name)
+
+        for field_name in missing_fields:
+            delattr(form_class, field_name)
