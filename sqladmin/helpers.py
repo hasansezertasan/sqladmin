@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import enum
 import inspect
+import json
 import os
 import re
 import unicodedata
@@ -333,3 +334,18 @@ def choice_type_coerce_factory(type_: Any) -> Callable[[Any], Any]:
 
 def is_async_session_maker(session_maker: sessionmaker) -> bool:
     return AsyncSession in session_maker.class_.__mro__
+
+
+def default_encoder(obj: Any) -> Any:
+    if hasattr(obj, "isoformat"):  # datetime-like
+        return obj.isoformat()
+    from decimal import Decimal
+
+    if isinstance(obj, Decimal):
+        return float(obj)
+
+    try:
+        json.dumps(obj)
+        return obj
+    except TypeError:
+        return str(obj)  # last resort
