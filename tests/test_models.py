@@ -109,9 +109,7 @@ class Shipment(Base):
     destination_address_id = Column(Integer, ForeignKey("addresses.id"))
 
     origin_address = relationship("Address", foreign_keys=[origin_address_id])
-    destination_address = relationship(
-        "Address", foreign_keys=[destination_address_id]
-    )
+    destination_address = relationship("Address", foreign_keys=[destination_address_id])
 
 
 @pytest.fixture(autouse=True)

@@ -96,10 +96,9 @@ class BaseAdmin:
         self.session_maker.configure(autoflush=False, autocommit=False)
         self.is_async = is_async_session_maker(self.session_maker)
 
-        middlewares = middlewares or []
+        middlewares = list(middlewares or [])
         self.authentication_backend = authentication_backend
         if authentication_backend:
-            middlewares = list(middlewares)
             middlewares.extend(authentication_backend.middlewares)
 
         self.admin = Starlette(middleware=middlewares)
