@@ -167,7 +167,7 @@ admin.add_view(AddressAdmin)
 admin.add_view(ProjectAdmin)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 async def prepare_database() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -178,7 +178,7 @@ async def prepare_database() -> AsyncGenerator[None, None]:
 
 
 @pytest.fixture
-async def prepare_data(prepare_database: Any) -> AsyncGenerator[None, None]:
+async def prepare_data() -> AsyncGenerator[None, None]:
     async with session_maker() as session:
         office1 = Office(name="Office1")
         office2 = Office(name="Office2")
@@ -195,7 +195,9 @@ async def prepare_data(prepare_database: Any) -> AsyncGenerator[None, None]:
             salary=80000.50,
             description="Senior administrator with management responsibilities",
             birthdate=datetime.date(2001, 7, 14),
-            created_at=datetime.datetime(2024, 11, 12, 3, 4, 5, tzinfo=datetime.timezone.utc),
+            created_at=datetime.datetime(
+                2024, 11, 12, 3, 4, 5, tzinfo=datetime.timezone.utc
+            ),
         )
         user2 = User(
             name="Regular User",
@@ -206,7 +208,9 @@ async def prepare_data(prepare_database: Any) -> AsyncGenerator[None, None]:
             salary=55000.75,
             description="Software developer specializing in web applications",
             birthdate=datetime.date(1994, 5, 31),
-            created_at=datetime.datetime(2024, 12, 31, 23, 59, 58, tzinfo=datetime.timezone.utc),
+            created_at=datetime.datetime(
+                2024, 12, 31, 23, 59, 58, tzinfo=datetime.timezone.utc
+            ),
         )
         user3 = User(
             name="Test User",
@@ -217,7 +221,9 @@ async def prepare_data(prepare_database: Any) -> AsyncGenerator[None, None]:
             salary=65000.00,
             description="Data analyst working on business intelligence",
             birthdate=datetime.date(1998, 10, 31),
-            created_at=datetime.datetime(2023, 3, 14, 12, 30, 0, tzinfo=datetime.timezone.utc),
+            created_at=datetime.datetime(
+                2023, 3, 14, 12, 30, 0, tzinfo=datetime.timezone.utc
+            ),
         )
         session.add_all([user1, user2, user3])
         await session.commit()
@@ -965,7 +971,9 @@ async def test_column_filter_conversion_edge_cases():
     result = created_at_filter._convert_value_for_column(
         "2021-11-30T22:33:43+00:00", User.created_at.property.columns[0]
     )
-    assert result == datetime.datetime(2021, 11, 30, 22, 33, 43, tzinfo=datetime.timezone.utc)
+    assert result == datetime.datetime(
+        2021, 11, 30, 22, 33, 43, tzinfo=datetime.timezone.utc
+    )
 
     # Test valid date conversion
     birthdate_filter = OperationColumnFilter(User.birthdate)

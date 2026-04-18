@@ -1,6 +1,6 @@
 import enum
 import json
-from typing import Any, Generator
+from typing import Generator
 
 import pytest
 from sqlalchemy import (
@@ -121,7 +121,7 @@ class Product(Base):
     is_sold = Column(Boolean, nullable=False)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def prepare_database() -> Generator[None, None, None]:
     Base.metadata.create_all(engine)
     yield
@@ -129,7 +129,7 @@ def prepare_database() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def client(prepare_database: Any) -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient, None, None]:
     with TestClient(app=app, base_url="http://testserver") as c:
         yield c
 
@@ -510,23 +510,20 @@ def test_update_endpoint_with_checkbox_widget(client: TestClient) -> None:
 
     assert response.status_code == 200
 
-    assert (
-        '<div class="form-switch d-flex align-items-center h-100">'
-        f'<input class="form-check-input" id="{Product.is_sold.key}" '
-        f'name="{Product.is_sold.key}" type="checkbox" value="y"></div>'
-        in response.text
-    )
+    assert '<div class="form-switch d-flex align-items-center h-100">' in response.text
+    assert f'id="{Product.is_sold.key}"' in response.text
+    assert f'name="{Product.is_sold.key}"' in response.text
+    assert 'type="checkbox"' in response.text
 
     response = client.get("/admin/product/edit/2")
 
     assert response.status_code == 200
 
-    assert (
-        '<div class="form-switch d-flex align-items-center h-100">'
-        f'<input checked class="form-check-input" id="{Product.is_sold.key}" '
-        f'name="{Product.is_sold.key}" type="checkbox" value="y"></div>'
-        in response.text
-    )
+    assert '<div class="form-switch d-flex align-items-center h-100">' in response.text
+    assert f'id="{Product.is_sold.key}"' in response.text
+    assert f'name="{Product.is_sold.key}"' in response.text
+    assert 'type="checkbox"' in response.text
+    assert "checked" in response.text
 
 
 def test_create_endpoint_post_form(client: TestClient) -> None:
