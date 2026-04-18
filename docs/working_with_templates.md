@@ -26,6 +26,62 @@ SQLAdmin and in the `content` block it adds custom HTML tags:
         details_template = "sqladmin/custom_details.html"
     ```
 
+### Customizing column filter templates
+
+Each built-in column filter declares a `template` attribute which defaults to one of
+`sqladmin/filters/lookup_filter.html` or `sqladmin/filters/operation_filter.html`.
+You can point a filter to your own template for full control over its UI—for example,
+to render lookup values in a drop-down instead of a long list of links:
+
+!!! example
+
+    ```python title="admin.py"
+    from sqladmin.filters import StaticValuesFilter
+
+
+    class StatusDropdownFilter(StaticValuesFilter):
+        template = "filters/status_dropdown_filter.html"
+
+        def __init__(self):
+            super().__init__(
+                column=Article.status,
+                values=[("draft", "Draft"), ("published", "Published")],
+                title="Status",
+            )
+    ```
+
+    ```html title="templates/filters/status_dropdown_filter.html"
+    {% extends "sqladmin/filters/base_filter.html" %}
+
+    {% block filter_body %}
+      {% set current_value = request.query_params.get(filter.parameter_name, '') %}
+
+      <form method="get" class="d-flex flex-column" style="gap: 8px;">
+        {% for key, value in request.query_params.items() %}
+          {% if key != filter.parameter_name %}
+          <input type="hidden" name="{{ key }}" value="{{ value }}">
+          {% endif %}
+        {% endfor %}
+
+        <select name="{{ filter.parameter_name }}" class="form-select form-select-sm">
+          {% for value, label in filter.lookups(request, model_view.model, model_view._run_arbitrary_query) %}
+            <option value="{{ value }}" {% if current_value == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        <div class="d-flex align-items-center" style="gap: 8px;">
+          <button type="submit" class="btn btn-sm btn-outline-primary">Apply</button>
+          {% if current_value %}
+          <a href="{{ request.url.remove_query_params(filter.parameter_name) }}" class="text-decoration-none small">Clear</a>
+          {% endif %}
+        </div>
+      </form>
+    {% endblock %}
+    ```
+
+This makes it possible to ship custom filter widgets by subclassing an existing filter
+and only overriding its template.
+
 ## Overriding default templates
 
 The recommended way to customize existing default templates (like adding a script to every page) without redefining the entire HTML structure is to extend the original template using the `sqladmin_original/` prefix. This allows you to selectively override or append to specific Jinja blocks using `{{ super() }}` while preserving the rest of the template.
