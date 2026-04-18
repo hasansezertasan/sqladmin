@@ -14,8 +14,8 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 from starlette.applications import Starlette
 
 from sqladmin import Admin, ModelView
@@ -38,7 +38,9 @@ except ImportError:
     Uuid = None
 
 Base = declarative_base()  # type: Any
-session_maker = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+session_maker = async_sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
 
 app = Starlette()
 admin = Admin(app=app, engine=engine, templates_dir="tests/templates")

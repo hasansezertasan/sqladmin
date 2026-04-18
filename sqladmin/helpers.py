@@ -22,12 +22,11 @@ from typing import (
 from sqlalchemy import Column
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import RelationshipProperty, sessionmaker
+from sqlalchemy.orm import RelationshipProperty
 
-from sqladmin._types import MODEL_PROPERTY
+from sqladmin._types import MODEL_PROPERTY, SESSION_MAKER
 
 T = TypeVar("T")
-
 
 _filename_ascii_strip_re = re.compile(r"[^A-Za-z0-9_.-]")
 _windows_device_files = (
@@ -332,7 +331,7 @@ def choice_type_coerce_factory(type_: Any) -> Callable[[Any], Any]:
     return choice_coerce
 
 
-def is_async_session_maker(session_maker: sessionmaker) -> bool:
+def is_async_session_maker(session_maker: SESSION_MAKER) -> bool:
     return AsyncSession in session_maker.class_.__mro__
 
 
