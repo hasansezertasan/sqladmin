@@ -13,6 +13,8 @@ theme:
       toggle:
         icon: lucide/moon
         name: Switch to light mode
+  icon:
+    repo: simple/github
 
 repo_name: smithyhq/sqladmin
 repo_url: https://github.com/smithyhq/sqladmin
