@@ -211,6 +211,11 @@ class UserAdmin(ModelView, model=User):
         ],
         User.profile_formattable: lambda m, a: f"Formatted {m.profile_formattable}",
     }
+    form_args = {
+        "profile": {
+            "allow_blank": True,
+        },
+    }
     save_as = True
 
 
