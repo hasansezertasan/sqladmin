@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 0.27.0 - 2026-05-29
+
+### Added
+* feat: make admin logo width and height configurable (closes #1045) by @SAY-5 in https://github.com/smithyhq/sqladmin/pull/1052
+* Feature: `after_model_change` response by @dhcsousa in https://github.com/smithyhq/sqladmin/pull/1030
+* Create form_details_query by @MaximDementyev in https://github.com/smithyhq/sqladmin/pull/1038
+
+### Fixed
+* fix(list): fix the list view to limit the page width to viewport size by @CHC383 in https://github.com/smithyhq/sqladmin/pull/1056
+* fix: forward kwargs to SessionMiddleware in AuthenticationBackend by @vahidzhe in https://github.com/smithyhq/sqladmin/pull/1036
+* Fixed overriding form_args in forms.py and widgets.py by @mmzeynalli in https://github.com/smithyhq/sqladmin/pull/1044
+
+### Docs
+* Docs: add contributing page to documentation site by @vahidzhe in https://github.com/smithyhq/sqladmin/pull/1034
+
+
+## New Contributors
+* @CHC383 made their first contribution in https://github.com/smithyhq/sqladmin/pull/1056
+* @SAY-5 made their first contribution in https://github.com/smithyhq/sqladmin/pull/1052
+* @dhcsousa made their first contribution in https://github.com/smithyhq/sqladmin/pull/1030
+
+**Full Changelog**: https://github.com/smithyhq/sqladmin/compare/0.26.0...0.27.0
+
+## Version 0.26.0 - 2025-05-16
+
+### Fixed
+* Drop Python 3.9 by @aminalaee in #1047
+* Migrate to Zensical by @aminalaee in #1048
+
+**Full Changelog**: https://github.com/smithyhq/sqladmin/compare/0.25.1...0.26.0
+
 ## Verion 0.25.1 - 2026-05-16
 
 ### Fixed
