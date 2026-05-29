@@ -33,6 +33,30 @@ $(document).on('click', '#modal-delete-button', function () {
   });
 });
 
+// One-time secret modal
+document.addEventListener('DOMContentLoaded', function () {
+  var modalEl = document.getElementById('modal-secret');
+  if (!modalEl) {
+    return;
+  }
+  document.getElementById('modal-secret-trigger').click();
+  var nextUrl = modalEl.dataset.nextUrl;
+  if (nextUrl) {
+    modalEl.addEventListener('hidden.bs.modal', function () {
+      window.location.replace(nextUrl);
+    });
+  }
+  var copyButton = document.getElementById('modal-secret-copy');
+  var secretValueInput = document.getElementById('modal-secret-value');
+  if (copyButton && secretValueInput) {
+    copyButton.addEventListener('click', function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(secretValueInput.value);
+      }
+    });
+  }
+});
+
 // Search
 $(document).on('click', '#search-button', function () {
   var searchTerm = encodeURIComponent($("#search-input").val());
