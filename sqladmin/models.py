@@ -803,6 +803,14 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         )
         return str(url) + "?" + query_params
 
+    # TODO: Merge current-view URL helpers into the legacy helpers in the next
+    # breaking-change window.
+    def _url_for_delete_current_view(self, request: Request, obj: Any) -> str:
+        pk = get_object_identifier(obj)
+        query_params = urlencode({"pks": pk})
+        url = request.url_for("admin:delete", identity=self.identity)
+        return str(url) + "?" + query_params
+
     def _url_for_details_with_prop(self, request: Request, obj: Any, prop: str) -> URL:
         target = getattr(obj, prop, None)
         if target is None:
@@ -811,6 +819,13 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
     def _url_for_action(self, request: Request, action_name: str) -> str:
         return str(request.url_for(f"admin:action-{self.identity}-{action_name}"))
+
+    def _build_url_for_current_view(self, name: str, request: Request, obj: Any) -> URL:
+        return request.url_for(
+            name,
+            identity=self.identity,
+            pk=get_object_identifier(obj),
+        )
 
     def _build_url_for(self, name: str, request: Request, obj: Any) -> URL:
         return request.url_for(
