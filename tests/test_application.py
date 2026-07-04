@@ -8,7 +8,8 @@ from starlette.datastructures import MutableHeaders
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -133,6 +134,54 @@ def test_middlewares() -> None:
 
     assert response.status_code == 200
     assert "x-correlation-id" in response.headers
+
+
+def _get_statics_mount(admin: Admin) -> Mount:
+    statics_mount = next(
+        route
+        for route in admin.admin.router.routes
+        if isinstance(route, Mount) and route.name == "statics"
+    )
+    assert isinstance(statics_mount.app, StaticFiles)
+    return statics_mount
+
+
+def test_static_files_use_default_kwargs() -> None:
+    app = Starlette()
+    admin = Admin(app=app, engine=engine)
+
+    statics_mount = _get_statics_mount(admin)
+
+    assert statics_mount.app.follow_symlink is False
+    assert statics_mount.app.packages == ["sqladmin"]
+
+
+def test_static_files_accept_custom_kwargs() -> None:
+    """Issue #863: package statics can opt into following symlinks."""
+    app = Starlette()
+    admin = Admin(
+        app=app,
+        engine=engine,
+        static_files_kwargs={"follow_symlink": True},
+    )
+
+    statics_mount = _get_statics_mount(admin)
+
+    assert statics_mount.app.follow_symlink is True
+    assert statics_mount.app.packages == ["sqladmin"]
+
+
+def test_static_files_kwargs_cannot_override_packages() -> None:
+    app = Starlette()
+    admin = Admin(
+        app=app,
+        engine=engine,
+        static_files_kwargs={"packages": ["not_sqladmin"]},
+    )
+
+    statics_mount = _get_statics_mount(admin)
+
+    assert statics_mount.app.packages == ["sqladmin"]
 
 
 def test_get_save_redirect_url():
