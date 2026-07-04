@@ -6,6 +6,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [0.28.0](https://github.com/smithyhq/sqladmin/releases/tag/0.28.0): 2026-07-04
+
+### Added
+
+* feat: add `rich_text_fields` for pluggable rich text editors by @vahidzhe in [#1074](https://github.com/smithyhq/sqladmin/pull/1074)
+* feat: pass `request` to column formatters by @Dexter2099 in [#1077](https://github.com/smithyhq/sqladmin/pull/1077)
+
+### Changed
+
+* build(deps): update Font Awesome to v7.2.0 by @CHC383 in [#1073](https://github.com/smithyhq/sqladmin/pull/1073)
+* build(deps): update to jQuery v4.0.0 and Select2 v4.1.0 by @CHC383 in [#1070](https://github.com/smithyhq/sqladmin/pull/1070)
+* build(deps): remove `tabler-icons.min.css.map` by @CHC383 in [#1071](https://github.com/smithyhq/sqladmin/pull/1071)
+
+### Fixed
+
+* fix: preserve base admin identity for polymorphic rows by @Dexter2099 in [#1076](https://github.com/smithyhq/sqladmin/pull/1076)
+* fix: allow clearing nullable AJAX relation fields by @Dexter2099 in [#1075](https://github.com/smithyhq/sqladmin/pull/1075)
+* fix: follow symlinks for static files by @Dexter2099 in [#1072](https://github.com/smithyhq/sqladmin/pull/1072)
+
+### Upgrade notes
+
+* **URL helpers:** `_build_url_for` and `_url_for_delete` use `self.identity` when the target object is an instance of the view's model (including polymorphic subclasses), and the object's class identity otherwise. Overrides of either helper apply to built-in templates.
+* **Column formatters:** Existing two-argument formatters continue to work; pass a third `request` argument to opt in.
+* **Front-end deps:** jQuery 4 and Select2 4.1 may affect custom admin JavaScript that relies on older APIs.
+
+### New Contributors
+
+* @Dexter2099 made their first contribution in [#1077](https://github.com/smithyhq/sqladmin/pull/1077)
+
+**Full Changelog**: [0.27.2...0.28.0](https://github.com/smithyhq/sqladmin/compare/0.27.2...0.28.0)
+
 ## Version [0.27.2](https://github.com/smithyhq/sqladmin/releases/tag/0.27.2): 2026-06-08
 
 ### Changed

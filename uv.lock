@@ -1608,7 +1608,7 @@ wheels = [
 
 [[package]]
 name = "sqladmin"
-version = "0.27.2"
+version = "0.28.0"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
