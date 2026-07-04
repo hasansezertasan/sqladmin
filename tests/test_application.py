@@ -322,7 +322,7 @@ def test_polymorphic_model_pages_use_view_identity() -> None:
     assert 'action="http://testserver/admin/pinned-object/edit/1"' in response.text
 
 
-def test_polymorphic_delete_helper_preserves_object_identity() -> None:
+def test_polymorphic_delete_helper_uses_view_identity() -> None:
     app = Starlette()
     admin = Admin(app=app, engine=engine)
 
@@ -339,7 +339,7 @@ def test_polymorphic_delete_helper_preserves_object_identity() -> None:
     client = TestClient(app)
     response = client.get("/delete-url")
 
-    assert response.text == "http://testserver/admin/news-pinned/delete?pks=1"
+    assert response.text == "http://testserver/admin/pinned-object/delete?pks=1"
 
 
 def test_is_list_template_global():
