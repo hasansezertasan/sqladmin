@@ -42,3 +42,28 @@
   </div>
 </div>
 {% endblock %}
+
+{% block head_css %}
+{{ super() }}
+{% if form is defined %}
+  {% set form_media = collect_form_media(form) %}
+  {% for url in form_media.css %}
+  <link rel="stylesheet" href="{{ url }}">
+  {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+{% if form is defined %}
+  {% set form_media = collect_form_media(form) %}
+  {% for url in form_media.js %}
+  <script src="{{ url }}"></script>
+  {% endfor %}
+  {% for field in form if field.editor_init_template is defined %}
+    {% with field = field %}
+      {% include field.editor_init_template %}
+    {% endwith %}
+  {% endfor %}
+{% endif %}
+{% endblock %}
