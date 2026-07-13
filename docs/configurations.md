@@ -268,7 +268,7 @@ The filter UI provides a dropdown for operation selection and a text input for t
 
     - **AllUniqueStringValuesFilter/StaticValuesFilter/ForeignKeyFilter**: Shows all possible values as links (good for columns with few unique values)
     - **OperationColumnFilter**: Provides operation dropdown + text input (good for columns with many possible values or numeric/date operations)
-    
+
     Choose OperationColumnFilter when you want users to type custom search terms with operation flexibility, and AllUniqueStringValuesFilter when you want to show all available options as clickable links.
 
 
@@ -319,8 +319,6 @@ The pagination options in the list page can be configured. The available options
 There are a few options which apply to both List and Detail pages. They include:
 
 - `column_labels`: A mapping of column labels, used to map column names to new names in all places.
-- `column_type_formatters`: A mapping of type keys and callable values to format in all places.
-  For example you can add custom date formatter to be used in both list and detail pages.
 - `save_as`: A boolean to enable "save as new" option when editing an object.
 - `save_as_continue`: A boolean to control the redirect URL if `save_as` is enabled.
 
@@ -334,6 +332,60 @@ There are a few options which apply to both List and Detail pages. They include:
         column_labels = {User.mail: "Email"}
         column_type_formatters = dict(ModelView.column_type_formatters, date=date_format)
         save_as = True
+    ```
+
+## Type formatters
+
+You can create formatters for data types without specifying field names in both `column_formatters` and `column_formatters_detail`. The following options are suitable for this:
+
+- `column_type_formatters`: Mapping type keys to callable values for formatting on list pages.
+- `column_type_formatters_detail`: A mapping of type keys and callable values to format in details pages.
+
+!!! example
+    ```python
+    class UserAdmin(ModelView, model=User):
+        column_type_formatters = {
+            type(None): lambda x: 'Empty',
+            str: lambda x: x[:10]
+        }
+        column_type_formatters_detail = {
+            type(None): lambda x: 'Null',
+            str: lambda x: x.title()
+        }
+    ```
+
+!!! tip
+
+    If `column_type_formatters_detail` is not explicitly specified, the `column_type_formatters` mapping is used for the detail page.
+
+??? example "Example with build-in formatters"
+
+    ```python
+    import enum
+    import datetime
+    import uuid
+
+    from enum import StrEnum
+    # from sqladmin._types import StrEnum # for python <3.11
+    from sqladmin.formatters import (
+        str_enum_formatter,
+        datetime_formatter,
+        copy_to_clipboard_formatter,
+    )
+
+
+    custom_column_type_formatters_detail = ModelView.column_type_formatters_detail.copy()
+    custom_column_type_formatters_detail.update(
+        {
+            StrEnum: str_enum_formatter,
+            datetime.datetime: datetime_formatter,
+            uuid.UUID: copy_to_clipboard_formatter,
+        }
+    )
+
+
+    class UserAdmin(ModelView, model=User):
+        column_type_formatters_detail = custom_column_type_formatters_detail
     ```
 
 ## Form options
@@ -393,13 +445,11 @@ The export options can be set per model and includes the following options:
 ## Pretty CSV Export
 - `ModelView.use_pretty_export`: Default value is `False`
 
-Enables exporting CSV files with user-friendly column labels and formatted cell values 
-matching the UI list view. 
-When enabled, exports utilize the `column_formatters` and `column_labels` defined in the admin view, 
-improving readability and ensuring consistency between the UI and exported data.  
+Enables exporting CSV files with user-friendly column labels and formatted cell values matching the UI list view.
+When enabled, exports utilize the `column_formatters` and `column_labels` defined in the admin view,
+improving readability and ensuring consistency between the UI and exported data.
 
-Custom cell formatting can be implemented in the ModelView class by overriding the async method 
-`custom_export_cell`, otherwise basic cell formatting is used by default.
+Custom cell formatting can be implemented in the ModelView class by overriding the async method custom_export_cell`, otherwise basic cell formatting is used by default.
 
 Example of usage:
 ```python
@@ -408,10 +458,10 @@ class ExamResultAdmin(ModelView, model=ExamResult):
 
     column_list = ["score", "instructors", "course.title", "course.instructors", "created_at"]
     column_labels = {
-        "score": "Score", 
-        "instructors": "Exam Instructors", 
-        "course.title": "Course Title", 
-        "course.instructors": "Course Instructors", 
+        "score": "Score",
+        "instructors": "Exam Instructors",
+        "course.title": "Course Title",
+        "course.instructors": "Course Instructors",
         "created_at": "Exam Time",
     }
     column_formatters = {
@@ -434,8 +484,6 @@ class ExamResultAdmin(ModelView, model=ExamResult):
             return ",".join(course_instructors_list)
         return None
 ```
-
-
 
 ## Import options
 
@@ -631,7 +679,6 @@ The available options for `action` are:
 - `add_in_list`: A boolean indicating if this action should be available in list page.
 - `add_in_detail`: A boolean indicating if this action should be available in detail page.
 - `confirmation_message`: A string message that if defined, will open a modal to ask for confirmation before calling the action method.
-
 
 ### Toast Notifications
 

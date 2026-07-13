@@ -29,6 +29,7 @@ import anyio
 from sqlalchemy import Column, String, asc, cast, desc, false, func, inspect, or_
 from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.collections import InstrumentedList, InstrumentedSet
 from sqlalchemy.orm.exc import DetachedInstanceError
 from sqlalchemy.sql.elements import ClauseElement
 from sqlalchemy.sql.expression import Select, select
@@ -42,11 +43,13 @@ from wtforms.fields.core import UnboundField
 from sqladmin._queries import Query
 from sqladmin._types import (
     _UNSET,
+    BASE_FORMATTERS_TYPE,
     MODEL_ATTR,
     SESSION_MAKER,
     ColumnFilter,
     OperationColumnFilter,
     SimpleColumnFilter,
+    StrEnum,
 )
 from sqladmin.ajax import create_ajax_loader
 from sqladmin.exceptions import InvalidModelError
@@ -732,7 +735,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         ```
     """
 
-    column_type_formatters: ClassVar[Dict[Type, Callable]] = BASE_FORMATTERS
+    column_type_formatters: ClassVar[BASE_FORMATTERS_TYPE] = BASE_FORMATTERS
     """Dictionary of value type formatters to be used in the list view.
 
     By default, two types are formatted:
@@ -747,6 +750,24 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         ```python
         class UserAdmin(ModelView, model=User):
             column_type_formatters = dict()
+        ```
+    """
+
+    column_type_formatters_detail: ClassVar[BASE_FORMATTERS_TYPE] = BASE_FORMATTERS
+    """Dictionary of value type formatters to be used in the details view.
+
+    By default, two types are formatted:
+
+        - None will be displayed as an empty string
+        - bool will be displayed as a checkmark if it is True otherwise as an X.
+
+    If you don't like the default behavior and don't want any type formatters applied,
+    just override this property with an empty dictionary:
+
+    ???+ example
+        ```python
+        class UserAdmin(ModelView, model=User):
+            column_type_formatters_detail = dict()
         ```
     """
 
@@ -840,6 +861,18 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         self._custom_actions_in_detail: Dict[str, str] = {}
         self._custom_actions_confirmation: Dict[str, str] = {}
 
+        self._column_type_formatters = self.column_type_formatters.copy()
+        if (
+            self.column_type_formatters != BASE_FORMATTERS
+            and self.column_type_formatters_detail == BASE_FORMATTERS
+        ):
+            # If you want to apply filters for types on all pages
+            self._column_type_formatters_detail = self.column_type_formatters.copy()
+        else:
+            self._column_type_formatters_detail = (
+                self.column_type_formatters_detail.copy()
+            )
+
     def _run_arbitrary_query_sync(self, stmt: ClauseElement) -> Any:
         with self.session_maker(expire_on_commit=False) as session:
             result = session.execute(stmt)
@@ -908,9 +941,46 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         return [(pk.name, False) for pk in self.pk_columns]
 
     def _default_formatter(self, value: Any) -> Any:
-        if type(value) in self.column_type_formatters:
-            formatter = self.column_type_formatters[type(value)]
+        value_class = type(value)
+
+        if value_class in self._column_type_formatters:
+            formatter = self._column_type_formatters[value_class]
             return formatter(value)
+
+        elif value_class is InstrumentedList:
+            return [self._default_formatter(item) for item in value]
+
+        elif value_class is InstrumentedSet:
+            return {self._default_formatter(item) for item in value}
+
+        if hasattr(value, "__class__") and hasattr(value.__class__, "__bases__"):
+            parents = value.__class__.__bases__
+            for parent_class in parents:
+                if parent_class in self._column_type_formatters:
+                    formatter = self._column_type_formatters[parent_class]
+                    return formatter(value)
+
+        return value
+
+    def _default_formatter_detail(self, value: Any) -> Any:
+        value_class = type(value)
+
+        if value_class in self._column_type_formatters_detail:
+            formatter = self._column_type_formatters_detail[value_class]
+            return formatter(value)
+
+        elif value_class is InstrumentedList:
+            return [self._default_formatter_detail(item) for item in value]
+
+        elif value_class is InstrumentedSet:
+            return {self._default_formatter_detail(item) for item in value}
+
+        if hasattr(value, "__class__") and hasattr(value.__class__, "__bases__"):
+            parents = value.__class__.__bases__
+            for parent_class in parents:
+                if parent_class in self._column_type_formatters_detail:
+                    formatter = self._column_type_formatters_detail[parent_class]
+                    return formatter(value)
 
         return value
 
@@ -1137,7 +1207,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
             except DetachedInstanceError:
                 obj = await self._lazyload_prop(obj, part)
 
-        if obj and isinstance(obj, Enum):
+        if obj and isinstance(obj, Enum) and not isinstance(obj, StrEnum):
             obj = obj.name
 
         return obj
@@ -1188,7 +1258,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
                 self._detail_formatter_accepts_request.get(prop, False),
             )
             if formatter
-            else self._default_formatter(value)
+            else self._default_formatter_detail(value)
         )
         return value, formatted_value
 

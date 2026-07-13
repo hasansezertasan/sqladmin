@@ -539,8 +539,28 @@ $(':input[data-role="select2-tags"]').each(function () {
   }
 });
 
+function copyToClipboard(element, value) {
+  navigator.clipboard.writeText(value)
+    .then(() => {
+      const alertElement = element.nextElementSibling;
+      if (
+        alertElement &&
+        alertElement.classList.contains('alert') &&
+        alertElement.classList.contains('alert-primary')
+      ) {
+        alertElement.classList.remove('fade');
+        setTimeout(() => {
+          alertElement.classList.add('fade');
+        }, 2000);
+      }
+    })
+    .catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+}
+
 // Automatically resize textarea on input events.
-$('.autoresize-textarea').each(function() {
+$('.autoresize-textarea').each(function () {
   const $textarea = $(this);
   if (!$textarea) return;
 
@@ -549,7 +569,7 @@ $('.autoresize-textarea').each(function() {
     $textarea.css('height', $textarea[0].scrollHeight + 'px');
   };
 
-  $textarea.on('input propertychange', function() {
+  $textarea.on('input propertychange', function () {
     updateTextareaHeight();
   });
 
@@ -558,7 +578,7 @@ $('.autoresize-textarea').each(function() {
 
 
 // Displays the number of characters in the text field.
-$('.chars-count-label').each(function() {
+$('.chars-count-label').each(function () {
   const $charsCountLabel = $(this);
   if (!$charsCountLabel) return;
 
@@ -575,7 +595,7 @@ $('.chars-count-label').each(function() {
     $charsCountLabel.toggleClass('warning', $maxLength > 0 && $currentLength >= $maxLength);
   };
 
-  $textarea.on('input propertychange', function() {
+  $textarea.on('input propertychange', function () {
     updateCharsCountLabel();
   });
 

@@ -58,6 +58,7 @@
         - form_create_rules
         - form_edit_rules
         - column_type_formatters
+        - column_type_formatters_detail
         - non_link_related_fields
         - list_query
         - count_query
