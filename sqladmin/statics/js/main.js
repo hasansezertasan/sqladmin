@@ -122,37 +122,43 @@ $(':input[data-role="datetimepicker"]:not([readonly])').each(function () {
 
 // Ajax Refs
 $(':input[data-role="select2-ajax"]').each(function () {
-  var allowBlank = !!$(this).data("allowBlank");
-  var isMultiple = !!$(this).prop("multiple");
+  var $select = $(this);
+
+  var allowBlank = !!$select.data("allowBlank");
+  var isMultiple = !!$select.prop("multiple");
+  var placeholderText = $select.attr("placeholder") || "Search";
+  var originalName = $select.attr("name");
+
   var select2AjaxOptions = {
     minimumInputLength: 1,
+    placeholder: placeholderText,
     ajax: {
-      url: $(this).data("url"),
+      url: $select.data("url"),
       dataType: 'json',
       data: function (params) {
-        var query = {
-          name: $(this).attr("name"),
+        return {
+          name: originalName,
           term: params.term,
         }
-        return query;
       }
     }
   };
 
   if (allowBlank && !isMultiple) {
     select2AjaxOptions.allowClear = true;
-    select2AjaxOptions.placeholder = "";
   }
 
-  $(this).select2(select2AjaxOptions);
+  $select.select2(select2AjaxOptions);
 
-  var existing_data = $(this).data("json") || [];
-  for (var i = 0; i < existing_data.length; i++) {
-    var data = existing_data[i];
+  var existing_data = $select.data("json") || [];
+  existing_data.forEach(function (data) {
     var option = new Option(data.text, data.id, true, true);
-    $(this).append(option).trigger('change');
-  }
+    $select.append(option);
+  });
+
+  $select.trigger('change');
 });
+
 
 // Checkbox select
 $("#select-all").on('click', function () {

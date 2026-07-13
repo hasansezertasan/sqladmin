@@ -348,3 +348,16 @@ def default_encoder(obj: Any) -> Any:
         return obj
     except TypeError:
         return str(obj)  # last resort
+
+
+def get_str_columns(model: Any) -> list[str]:
+    """Return names of String columns for a model, used for auto AJAX search."""
+    from sqlalchemy import String as SAString
+
+    mapper = sa_inspect(model).mapper
+    result = []
+    for prop in mapper.column_attrs:
+        col = prop.columns[0]
+        if isinstance(col.type, SAString):
+            result.append(prop.key)
+    return result

@@ -686,15 +686,15 @@ class Admin(BaseAdminView):
         identity = request.path_params["identity"]
         model_view = self._find_model_view(identity)
 
+        Form = await model_view.scaffold_form(model_view._form_edit_rules)
         model = await model_view.get_object_for_edit(request)
         if not model:
             raise HTTPException(status_code=404)
-
-        Form = await model_view.scaffold_form(model_view._form_edit_rules)
+        initial_data = await model_view.get_form_data_for_edit(model)
         context = {
             "obj": model,
             "model_view": model_view,
-            "form": Form(obj=model, data=self._normalize_wtform_data(model)),
+            "form": Form(data=initial_data),
         }
 
         if request.method == "GET":

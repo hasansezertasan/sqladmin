@@ -49,10 +49,16 @@ from sqladmin._types import (
 from sqladmin.ajax import create_ajax_loader
 from sqladmin.exceptions import InvalidModelError
 from sqladmin.formatters import BASE_FORMATTERS
-from sqladmin.forms import ModelConverter, ModelConverterBase, get_model_form
+from sqladmin.forms import (
+    WTFORMS_ATTRS,
+    ModelConverter,
+    ModelConverterBase,
+    get_model_form,
+)
 from sqladmin.helpers import (
     Writer,
     default_encoder,
+    get_direction,
     get_object_identifier,
     get_primary_keys,
     object_identifier_values,
@@ -462,7 +468,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
     # Template configuration
     show_compact_lists: ClassVar[bool] = True
-    """Show compact lists. Default is `True`.
+    """Show compact lists. Default is `True`. 
     If False, when showing lists of objects, each object will be \
     displayed in a separate line."""
 
@@ -503,7 +509,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     """
     Enable export of CSV files using column labels and column formatters.
 
-    If set to True, the export will apply column labels and formatting logic
+    If set to True, the export will apply column labels and formatting logic 
     used in the list template.
     Otherwise, raw database values and field names will be used.
 
@@ -763,6 +769,8 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
                 model_admin=self, name=name, options=options
             )
 
+        self._ajax_relation_names: set[str] = set(self._form_ajax_refs.keys())
+
         self._refresh_form_rules_cache()
 
         self._custom_actions_in_list: Dict[str, str] = {}
@@ -976,6 +984,43 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     async def get_object_for_edit(self, request: Request) -> Any:
         stmt = self.form_edit_query(request)
         return await self._get_object_by_pk(stmt)
+
+    async def get_form_data_for_edit(self, obj: Any) -> dict[str, Any]:
+        result = {}
+        pk_value = get_object_identifier(obj)
+        parent_stmt = self._stmt_by_identifier(str(pk_value))
+        for name in self._form_prop_names:
+            if name in self._ajax_relation_names:
+                relation = self._mapper.relationships[name]
+                target = relation.mapper.class_
+                direction = get_direction(relation)
+                if direction in ("ONETOMANY", "MANYTOMANY"):
+                    whereclause = parent_stmt.whereclause
+                    if whereclause is None:
+                        continue
+                    stmt = (
+                        select(target)
+                        .join(getattr(self.model, name))
+                        .where(whereclause)
+                        .distinct()
+                    )
+                    result[name] = await self._run_query(stmt)
+                else:
+                    fk_value = getattr(
+                        obj, relation.local_remote_pairs[0][0].name, None
+                    )
+                    if fk_value is not None:
+                        target_pk = get_primary_keys(target)[0]
+                        stmt = select(target).where(target_pk == fk_value)
+                        rows = await self._run_query(stmt)
+                        result[name] = rows[0] if rows else None
+                    else:
+                        result[name] = None
+            else:
+                value = getattr(obj, name, None)
+                wtf_key = WTFORMS_ATTRS.get(name, name)
+                result[wtf_key] = value
+        return result
 
     async def get_object_for_delete(self, value: Any) -> Any:
         stmt = self._stmt_by_identifier(value)
@@ -1197,24 +1242,24 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     async def scaffold_form(self, rules: List[str] | None = None) -> Type[Form]:
         if self.form is not None:
             return self.form
+        form_ajax_refs = dict(self._form_ajax_refs)
+        self._ajax_relation_names = set(form_ajax_refs.keys())
 
         form = await get_model_form(
             model=self.model,
-            session_maker=self.session_maker,  # type: ignore[arg-type]
+            session_maker=self.session_maker,
             only=self._form_prop_names,
             column_labels=self._column_labels,
             form_args=self.form_args,
             form_widget_args=self.form_widget_args,
             form_class=self.form_base_class,
             form_overrides=self.form_overrides,
-            form_ajax_refs=self._form_ajax_refs,
+            form_ajax_refs=form_ajax_refs,
             form_include_pk=self.form_include_pk,
             form_converter=self.form_converter,
         )
-
         if rules:
             self._validate_form_class(rules, form)
-
         return form
 
     def search_placeholder(self) -> str:
@@ -1331,7 +1376,9 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
 
         stmt = self._stmt_by_identifier(request.path_params["pk"])
         for relation in self._form_relations:
-            stmt = stmt.options(selectinload(relation))
+            name = relation.key
+            if name not in self._ajax_relation_names:
+                stmt = stmt.options(selectinload(relation))
         return stmt
 
     def count_query(self, request: Request) -> Select:
