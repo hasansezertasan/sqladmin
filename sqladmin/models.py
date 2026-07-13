@@ -5,6 +5,7 @@ import json
 import time
 import warnings
 from enum import Enum
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -812,6 +813,7 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         self._form_relations = [
             getattr(self.model, name) for name in self._form_relation_names
         ]
+        self._form_overrides = self._build_column_pairs(self.form_overrides)
 
         self._export_prop_names = self.get_export_columns()
 
@@ -1088,6 +1090,38 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
         stmt = self._stmt_by_identifier(value)
         return await self._get_object_by_pk(stmt)
 
+    async def get_object_filepath(self, identifier: str, column_name: str) -> Path:
+        stmt = self._stmt_by_identifier(identifier)
+        obj = await self._get_object_by_pk(stmt)
+
+        if column_name not in self._mapper.columns:
+            raise HTTPException(status_code=404, detail="Unknown column.")
+
+        column_value = getattr(obj, column_name)
+        from sqladmin.helpers import (
+            get_column_storage_roots,
+            is_http_url,
+            resolve_storage_path,
+            validate_servable_file_path,
+        )
+
+        path = resolve_storage_path(column_value)
+        if path is None:
+            raise HTTPException(status_code=404)
+        if is_http_url(path):
+            raise HTTPException(status_code=400, detail="Remote URLs are not served.")
+
+        allowed_roots = get_column_storage_roots(self._mapper.columns[column_name])
+        try:
+            return validate_servable_file_path(path, allowed_roots)
+        except ValueError as exc:
+            message = str(exc)
+            if message == "File not found":
+                raise HTTPException(status_code=404) from exc
+            if message == "File path not allowed":
+                raise HTTPException(status_code=403, detail=message) from exc
+            raise HTTPException(status_code=400, detail=message) from exc
+
     def _stmt_by_identifier(self, identifier: str) -> Select:
         stmt = select(self.model)
         pks = get_primary_keys(self.model)
@@ -1327,8 +1361,8 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
     async def scaffold_form(self, rules: List[str] | None = None) -> Type[Form]:
         if self.form is not None:
             return self.form
-        form_ajax_refs = dict(self._form_ajax_refs)
-        self._ajax_relation_names = set(form_ajax_refs.keys())
+
+        self._ajax_relation_names = set(self._form_ajax_refs.keys())
 
         form = await get_model_form(
             model=self.model,
@@ -1338,8 +1372,8 @@ class ModelView(BaseView, metaclass=ModelViewMeta):
             form_args=self.form_args,
             form_widget_args=self.form_widget_args,
             form_class=self.form_base_class,
-            form_overrides=self.form_overrides,
-            form_ajax_refs=form_ajax_refs,
+            form_overrides=self._form_overrides,
+            form_ajax_refs=self._form_ajax_refs,
             form_include_pk=self.form_include_pk,
             form_converter=self.form_converter,
         )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import io
 import logging
+from pathlib import Path
 from types import MethodType
 from typing import (
     Any,
@@ -24,6 +25,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import (
+    FileResponse,
     JSONResponse,
     PlainTextResponse,
     RedirectResponse,
@@ -375,13 +377,6 @@ class BaseAdminView(BaseAdmin):
             if can_edit_row is not True:
                 raise HTTPException(status_code=403)
 
-    async def _export(self, request: Request) -> None:
-        model_view = self._find_model_view(request.path_params["identity"])
-        if not model_view.can_export or not model_view.is_accessible(request):
-            raise HTTPException(status_code=403)
-        if request.path_params["export_type"] not in model_view.export_types:
-            raise HTTPException(status_code=404)
-
     async def _import(self, request: Request) -> None:
         model_view = self._find_model_view(request.path_params["identity"])
         if not model_view.is_accessible(request):
@@ -390,6 +385,44 @@ class BaseAdminView(BaseAdmin):
         can_import = await model_view.check_can_import(request)
         if not can_import:
             raise HTTPException(status_code=403)
+
+    async def _export(self, request: Request) -> None:
+        model_view = self._find_model_view(request.path_params["identity"])
+        if not model_view.can_export or not model_view.is_accessible(request):
+            raise HTTPException(status_code=403)
+        if request.path_params["export_type"] not in model_view.export_types:
+            raise HTTPException(status_code=404)
+
+    async def _file_access(self, request: Request) -> ModelView:
+        """Authorize file preview/download like the details view."""
+
+        model_view = self._find_model_view(request.path_params["identity"])
+        if not model_view.can_view_details or not model_view.is_accessible(request):
+            raise HTTPException(status_code=403)
+
+        if hasattr(model_view, "check_can_view_details"):
+            pk = request.path_params.get("pk")
+            if pk is None or not isinstance(pk, str):
+                raise ValueError(
+                    f'pk not found in request.path_params "{request.path_params}"'
+                )
+            model = await model_view.get_object_for_details(request)
+            can_view_details_row = await model_view.check_can_view_details(
+                request, model
+            )
+            if can_view_details_row is not True:
+                raise HTTPException(status_code=403)
+
+        return model_view
+
+    async def _get_file(self, request: Request) -> Path:
+        """Get a validated file path for preview/download."""
+
+        model_view = await self._file_access(request)
+        return await model_view.get_object_filepath(
+            request.path_params["pk"],
+            request.path_params["column_name"],
+        )
 
 
 class Admin(BaseAdminView):
@@ -517,6 +550,18 @@ class Admin(BaseAdminView):
             ),
             Route("/login", endpoint=self.login, name="login", methods=["GET", "POST"]),
             Route("/logout", endpoint=self.logout, name="logout", methods=["GET"]),
+            Route(
+                "/{identity}/{pk:path}/{column_name}/download/",
+                endpoint=self.file_download,
+                name="file_download",
+                methods=["GET"],
+            ),
+            Route(
+                "/{identity}/{pk:path}/{column_name}/preview/",
+                endpoint=self.file_preview,
+                name="file_preview",
+                methods=["GET"],
+            ),
         ]
 
         self.admin.router.routes = routes
@@ -642,7 +687,6 @@ class Admin(BaseAdminView):
     @login_required
     async def create(self, request: Request) -> Response:
         """Create model endpoint."""
-
         await self._create(request)
 
         identity = request.path_params["identity"]
@@ -841,6 +885,20 @@ class Admin(BaseAdminView):
             return response
 
         return RedirectResponse(request.url_for("admin:index"), status_code=302)
+
+    @login_required
+    async def file_download(self, request: Request) -> Response:
+        """Download file endpoint."""
+        request_path = await self._get_file(request)
+        return FileResponse(request_path, filename=request_path.name)
+
+    @login_required
+    async def file_preview(self, request: Request) -> Response:
+        """Preview file inline."""
+        request_path = await self._get_file(request)
+        return FileResponse(
+            request_path, filename=request_path.name, content_disposition_type="inline"
+        )
 
     @login_required
     async def ajax_lookup(self, request: Request) -> Response:
