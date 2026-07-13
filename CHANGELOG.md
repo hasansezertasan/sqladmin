@@ -6,6 +6,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [0.29.0](https://github.com/smithyhq/sqladmin/releases/tag/0.29.0): 2026-07-13
+
+### DEPRECATIONS
+
+* Using an empty string filter value for "All" is deprecated; use "__all" instead.
+
+### Added
+
+* feat: add CSV import with streaming progress and row-level validation by @alserious/@mmzeynalli in [#877](https://github.com/smithyhq/sqladmin/pull/877)
+* feat: add file download support by @korolenkowork/@mmzeynalli in [#702](https://github.com/smithyhq/sqladmin/pull/702)
+* feat: add auto-resizing textarea widget with character counter by @maxim-f1 in [#1083](https://github.com/smithyhq/sqladmin/pull/1083)
+* feat: add `column_type_formatters_detail` by @maxim-f1/@mmzeynalli in [#999](https://github.com/smithyhq/sqladmin/pull/999)
+* feat: add `default_value` to filters by @wnowicki/@mmzeynalli in [#1004](https://github.com/smithyhq/sqladmin/pull/1004)
+
+### Changed
+
+* feat: allow `AuthenticationBackend.login` to return `Response` by @sheldygg/@mmzeynalli in [#935](https://github.com/smithyhq/sqladmin/pull/935)
+* build(deps-dev): bump phonenumbers from 9.0.28 to 9.0.34 by @dependabot[bot] in [#1088](https://github.com/smithyhq/sqladmin/pull/1088)
+* build(deps-dev): bump pytest from 9.0.3 to 9.1.1 by @dependabot[bot] in [#1090](https://github.com/smithyhq/sqladmin/pull/1090)
+* build(deps-dev): bump psycopg2-binary from 2.9.11 to 2.9.12 by @dependabot[bot] in [#1089](https://github.com/smithyhq/sqladmin/pull/1089)
+* build(deps-dev): bump pillow from 12.2.0 to 12.3.0 by @dependabot[bot] in [#1087](https://github.com/smithyhq/sqladmin/pull/1087)
+* build(deps-dev): bump zensical from 0.0.42 to 0.0.50 by @dependabot[bot] in [#1086](https://github.com/smithyhq/sqladmin/pull/1086)
+
+### Fixed
+
+* docs: fix typos in docstrings and documentation by @maxtaran2010 in [#1080](https://github.com/smithyhq/sqladmin/pull/1080)
+* fix: resolve boolean input widget crash on WTForms 3.2 by @Vansh-Sharma27 in [#1084](https://github.com/smithyhq/sqladmin/pull/1084)
+* fix: avoid unnecessary `selectinload` for AJAX relations on edit page by @arturbent0/@mmzeynalli in [#1059](https://github.com/smithyhq/sqladmin/pull/1059)
+* fix: persist AJAX selected values after validation errors by @maxim-f1/@mmzeynalli in [#1039](https://github.com/smithyhq/sqladmin/pull/1039)
+* fix: skip link formatting for fields that cannot be rendered as links by @twistfire92/@mmzeynalli in [#948](https://github.com/smithyhq/sqladmin/pull/948)
+
+### New Contributors
+
+* @maxtaran2010 made their first contribution in [#1080](https://github.com/smithyhq/sqladmin/pull/1080)
+* @arturbent0 made their first contribution in [#1059](https://github.com/smithyhq/sqladmin/pull/1059)
+* @twistfire92 made their first contribution in [#948](https://github.com/smithyhq/sqladmin/pull/948)
+
+**Full Changelog**: [0.28.0...0.29.0](https://github.com/smithyhq/sqladmin/compare/0.28.0...0.29.0)
+
 ## Version [0.28.0](https://github.com/smithyhq/sqladmin/releases/tag/0.28.0): 2026-07-04
 
 ### Added
