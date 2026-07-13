@@ -45,3 +45,12 @@
     border: 0;
 }
 
+.autoresize-textarea {
+  min-height: 25px;
+  overflow-y: hidden;
+  height: 25px;
+}
+
+.chars-count-label.warning {
+  color: red;
+}

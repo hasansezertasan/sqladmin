@@ -29,7 +29,6 @@ from wtforms import (
     Form,
     IntegerField,
     StringField,
-    TextAreaField,
     TimeField,
     validators,
 )
@@ -57,6 +56,7 @@ from sqladmin.fields import (
     QuerySelectMultipleField,
     Select2TagsField,
     SelectField,
+    TextAreaField,
     UuidField,
 )
 from sqladmin.helpers import (

@@ -36,6 +36,10 @@ __all__ = [
     "SelectField",
     "Select2TagsField",
     "file_display_formatter",
+    "BooleanField",
+    "FileField",
+    "UuidField",
+    "TextAreaField",
 ]
 
 
@@ -533,3 +537,46 @@ class UuidField(fields.StringField):
                 self.data = None
         else:
             self.data = None
+
+
+class TextAreaField(fields.StringField):
+    """
+    This field represents an HTML `textarea` and can be used to take
+    multi-line input.
+
+    To disable automatic updating of the input size,
+    you need to pass enable_autoresize = False to the field arguments.
+    ```python
+    form_args = {
+        'field_name': {
+            'enable_autoresize': False
+        }
+    }
+    ```
+
+    To disable the display of the number of characters,
+    you need to pass the value show_chars_count = False to the field arguments.
+
+    ```python
+    form_args = {
+        'field_name': {
+            'show_chars_count': False
+        }
+    }
+    ```
+    """
+
+    def __init__(
+        self,
+        label: str | None = None,
+        validators: list | None = None,
+        *,
+        enable_autoresize: bool = True,
+        show_chars_count: bool = True,
+        **kwargs: Any,
+    ):
+        super().__init__(label, validators, **kwargs)
+        self.enable_autoresize = enable_autoresize
+        self.show_chars_count = show_chars_count
+
+    widget = sqladmin_widgets.TextAreaWidget()

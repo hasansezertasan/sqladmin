@@ -18,6 +18,7 @@ from sqladmin.fields import (
     QuerySelectMultipleField,
     Select2TagsField,
     SelectField,
+    TextAreaField,
     UuidField,
 )
 from tests.common import DummyData
@@ -226,3 +227,12 @@ def test_boolean_field() -> None:
     form = FRequired()
     html = form.boolean()
     assert "required" in html
+
+
+def test_textarea_field() -> None:
+    class F(Form):
+        text = TextAreaField()
+
+    form = F()
+    assert "autoresize-textarea" in form.text()
+    assert "chars-count-label" in form.text()

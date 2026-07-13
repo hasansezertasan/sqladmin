@@ -4,7 +4,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 from wtforms import Field, SelectFieldBase, widgets
 from wtforms.widgets import html_params
 
@@ -170,3 +170,42 @@ class BooleanInputWidget(widgets.CheckboxInput):
         )
 
         return template.format(text=super().__call__(field, **kwargs))
+
+
+class TextAreaWidget(widgets.TextArea):
+    """
+    Render a textarea that automatically resizes on input.
+    """
+
+    validation_attrs = ["required", "disabled", "readonly", "maxlength", "minlength"]
+
+    def __call__(self, field: Field, **kwargs: Any) -> Markup:
+        kwargs.setdefault("id", field.id)
+        flags = getattr(field, "flags", {})
+        for k in dir(flags):
+            if k in self.validation_attrs and k not in kwargs:
+                kwargs[k] = getattr(flags, k)
+
+        class_ = kwargs.get("class")
+        if getattr(field, "enable_autoresize", True) is True:
+            class_ = " ".join(filter(None, (class_, "autoresize-textarea")))
+            kwargs.setdefault("rows", "1")
+
+        if class_:
+            kwargs["class"] = class_
+
+        if hasattr(field, "_value") and callable(field._value):
+            kwargs["value"] = field._value()
+
+        if getattr(field, "show_chars_count", True) is True:
+            chars_count = '<div class="chars-count-label pt-1"></div>'
+        else:
+            chars_count = ""
+
+        value = kwargs.pop("value", "")
+
+        return Markup(
+            "<textarea %s>%s</textarea>"
+            % (html_params(name=field.name, **kwargs), escape(value))
+            + chars_count
+        )  # nosec: markupsafe_markup_xss

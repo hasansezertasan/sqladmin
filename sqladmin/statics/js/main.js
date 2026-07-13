@@ -538,3 +538,46 @@ $(':input[data-role="select2-tags"]').each(function () {
     $(this).append(option).trigger('change');
   }
 });
+
+// Automatically resize textarea on input events.
+$('.autoresize-textarea').each(function() {
+  const $textarea = $(this);
+  if (!$textarea) return;
+
+  const updateTextareaHeight = () => {
+    $textarea.css('height', 'auto');
+    $textarea.css('height', $textarea[0].scrollHeight + 'px');
+  };
+
+  $textarea.on('input propertychange', function() {
+    updateTextareaHeight();
+  });
+
+  updateTextareaHeight(); // Resize on start
+});
+
+
+// Displays the number of characters in the text field.
+$('.chars-count-label').each(function() {
+  const $charsCountLabel = $(this);
+  if (!$charsCountLabel) return;
+
+  const $textarea = $charsCountLabel.prev('textarea');
+  if (!$textarea.length) return;
+
+  const $maxLength = parseInt($textarea.attr('maxlength'), 10) || 0;
+
+  const updateCharsCountLabel = () => {
+    if (!$charsCountLabel.length) return;
+
+    const $currentLength = $textarea.val().length;
+    $charsCountLabel.text(`Number of characters: ${$currentLength}${$maxLength ? ` / ${$maxLength}` : ''}`);
+    $charsCountLabel.toggleClass('warning', $maxLength > 0 && $currentLength >= $maxLength);
+  };
+
+  $textarea.on('input propertychange', function() {
+    updateCharsCountLabel();
+  });
+
+  updateCharsCountLabel(); // Show on start
+});
