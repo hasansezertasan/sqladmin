@@ -32,6 +32,7 @@ from starlette.responses import (
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from sqladmin._import import handle_import_upload, import_csv, import_error_response
 from sqladmin._menu import CategoryMenu, Menu, ViewMenu
 from sqladmin._types import ENGINE_TYPE, SESSION_MAKER
 from sqladmin.ajax import QueryAjaxModelLoader
@@ -381,6 +382,15 @@ class BaseAdminView(BaseAdmin):
         if request.path_params["export_type"] not in model_view.export_types:
             raise HTTPException(status_code=404)
 
+    async def _import(self, request: Request) -> None:
+        model_view = self._find_model_view(request.path_params["identity"])
+        if not model_view.is_accessible(request):
+            raise HTTPException(status_code=403)
+
+        can_import = await model_view.check_can_import(request)
+        if not can_import:
+            raise HTTPException(status_code=403)
+
 
 class Admin(BaseAdminView):
     """Main entrypoint to admin interface.
@@ -497,6 +507,12 @@ class Admin(BaseAdminView):
                 "/{identity}/export/{export_type}", endpoint=self.export, name="export"
             ),
             Route(
+                "/{identity}/import",
+                endpoint=self.import_endpoint,
+                name="import",
+                methods=["POST"],
+            ),
+            Route(
                 "/{identity}/ajax/lookup", endpoint=self.ajax_lookup, name="ajax_lookup"
             ),
             Route("/login", endpoint=self.login, name="login", methods=["GET", "POST"]),
@@ -533,7 +549,11 @@ class Admin(BaseAdminView):
                 request.url.include_query_params(page=pagination.page), status_code=302
             )
 
-        context = {"model_view": model_view, "pagination": pagination}
+        context = {
+            "model_view": model_view,
+            "pagination": pagination,
+            "can_import": await model_view.check_can_import(request),
+        }
 
         if request.query_params.get("error"):
             context["error"] = request.query_params["error"]
@@ -755,6 +775,31 @@ class Admin(BaseAdminView):
         )
         return await model_view.export_data(
             rows, export_type=export_type, request=request
+        )
+
+    @login_required
+    async def import_endpoint(self, request: Request) -> Response:
+        """Import model endpoint."""
+
+        await self._import(request)
+
+        identity = request.path_params["identity"]
+        model_view = self._find_model_view(identity)
+
+        upload = await handle_import_upload(request, model_view)
+        if upload.error:
+            return import_error_response(upload.error, upload.status_code)
+        if not upload.content:
+            return import_error_response(
+                "No CSV file uploaded or file does not have a .csv extension."
+            )
+
+        return await import_csv(
+            request,
+            model_view,
+            upload.content,
+            upload.continue_on_error,
+            self._denormalize_wtform_data,
         )
 
     async def login(self, request: Request) -> Response:

@@ -37,6 +37,13 @@
         - column_export_exclude_list
         - export_types
         - export_max_rows
+        - can_import
+        - check_can_import
+        - column_import_list
+        - column_import_exclude_list
+        - max_import_file_size
+        - import_max_rows
+        - max_reported_missed_rows
         - form
         - form_args
         - form_columns
@@ -59,6 +66,7 @@
         - details_query
         - on_model_change
         - after_model_change
+        - on_import_row
         - on_model_delete
         - after_model_delete
         - save_as
