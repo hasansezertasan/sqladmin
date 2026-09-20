@@ -77,6 +77,17 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+def _save_button_clicked(form: FormData, label: str) -> bool:
+    """Return whether the submit button ``label`` was pressed.
+
+    The create/edit templates render the submit buttons via gettext, so in
+    non-English locales the submitted ``save`` value is the translated label.
+    Compare against both the English literal and the active-locale translation.
+    """
+
+    return form.get("save") in (label, gettext(label))
+
+
 class BaseAdmin:
     """Base class for implementing Admin interface.
 
@@ -878,7 +889,9 @@ class Admin(BaseAdminView):
             )
 
         form_data = await self._handle_form_data(request, model)
-        save_as_new = model_view.save_as and form_data.get("save") == "Save as new"
+        save_as_new = model_view.save_as and _save_button_clicked(
+            form_data, "Save as new"
+        )
         if save_as_new and not (
             model_view.can_create and await model_view.check_can_create(request)
         ):
@@ -1076,14 +1089,14 @@ class Admin(BaseAdminView):
         identity = request.path_params["identity"]
         identifier = get_object_identifier(obj)
 
-        if form.get("save") == "Save":
+        if _save_button_clicked(form, "Save"):
             url = URL(str(request.url_for("admin:list", identity=identity)))
             if request.url.query:
                 url = url.replace(query=request.url.query)
             return url
 
-        if form.get("save") == "Save and continue editing" or (
-            form.get("save") == "Save as new" and model_view.save_as_continue
+        if _save_button_clicked(form, "Save and continue editing") or (
+            _save_button_clicked(form, "Save as new") and model_view.save_as_continue
         ):
             return request.url_for("admin:edit", identity=identity, pk=identifier)
 
