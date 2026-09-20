@@ -6,7 +6,15 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import (
     attribute_keyed_dict,
     declarative_base,
@@ -32,6 +40,9 @@ class User(Base):
     name = Column(String)
     email = Column(String)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime)
+    balance = Column(Numeric)
+    meta = Column(String)
 
     addresses = relationship("Address", back_populates="user")
     tags = relationship("Tag", back_populates="user", collection_class=set)
@@ -123,7 +134,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "email"]
             session_maker = session_maker
-            is_async = False
 
         user = User(id=1, name="John Doe", email="john@example.com", is_active=True)
         model_view = UserAdmin()
@@ -142,7 +152,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "email"]
             session_maker = session_maker
-            is_async = False
 
             async def custom_export_cell(
                 self, row: Any, name: str, value: Any
@@ -170,7 +179,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "is_active"]
             session_maker = session_maker
-            is_async = False
 
         user = User(id=1, name="John Doe", is_active=True)
         model_view = UserAdmin()
@@ -294,7 +302,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "email"]
             session_maker = session_maker
-            is_async = False
 
         user = User(id=1, name="John Doe", email=None)
         model_view = UserAdmin()
@@ -313,7 +320,6 @@ class TestPrettyExport:
         class AddressAdmin(ModelView, model=Address):
             column_list = ["id", "street", "user.name"]
             session_maker = session_maker
-            is_async = False
 
         user = User(id=1, name="John Doe")
         address = Address(id=1, street="123 Main St", user=user)
@@ -358,7 +364,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "email"]
             session_maker = session_maker
-            is_async = False
 
         users = [
             User(id=1, name="John Doe", email="john@example.com"),
@@ -391,7 +396,6 @@ class TestPrettyExport:
                 "email": "Email Address",
             }
             session_maker = session_maker
-            is_async = False
 
         users = [
             User(id=1, name="John Doe", email="john@example.com"),
@@ -413,7 +417,6 @@ class TestPrettyExport:
                 "name": "Full Name",
             }
             session_maker = session_maker
-            is_async = False
 
         users = [
             User(id=1, name="John Doe", email="john@example.com"),
@@ -433,7 +436,6 @@ class TestPrettyExport:
             column_list = ["id", "name", "is_active"]
             column_labels = {"id": "ID", "name": "Name", "is_active": "Active Status"}
             session_maker = session_maker
-            is_async = False
 
             async def custom_export_cell(
                 self, row: Any, name: str, value: Any
@@ -462,7 +464,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name", "email"]
             session_maker = session_maker
-            is_async = False
 
         users = []
         model_view = UserAdmin()
@@ -482,7 +483,6 @@ class TestPrettyExport:
             column_list = ["id", "name", "email", "is_active"]
             column_export_list = ["name", "email"]
             session_maker = session_maker
-            is_async = False
 
         users = [
             User(id=1, name="John Doe", email="john@example.com", is_active=True),
@@ -502,7 +502,6 @@ class TestPrettyExport:
             column_list = ["id", "name", "email"]
             use_pretty_export = True
             session_maker = session_maker
-            is_async = False
 
         users = [
             User(id=1, name="John Doe", email="john@example.com"),
@@ -523,7 +522,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_list = ["id", "name"]
             session_maker = session_maker
-            is_async = False
 
             def get_export_name(self, export_type: str) -> str:
                 return f"test_export_with_special_chars!@#.{export_type}"
@@ -535,10 +533,7 @@ class TestPrettyExport:
         content_disposition = response.headers["Content-Disposition"]
 
         assert "attachment" in content_disposition
-        assert (
-            "test_export_with_special_chars.csv" in content_disposition
-            or "test_export_with_special_chars_.csv" in content_disposition
-        )
+        assert "test_export_with_special_chars.csv" in content_disposition
 
     async def test_export_json_serialization_types_and_fallback(self):
         class NonSerializable:
@@ -548,7 +543,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_export_list = ["created_at", "balance", "meta"]
             session_maker = session_maker
-            is_async = False
 
             async def get_prop_value(self, obj: Any, prop: str) -> Any:
                 values = {
@@ -579,7 +573,6 @@ class TestPrettyExport:
         class UserAdmin(ModelView, model=User):
             column_export_list = ["id"]
             session_maker = session_maker
-            is_async = False
 
             def get_export_name(self, export_type: str) -> str:
                 return f"test_export_with_special_chars!@#.{export_type}"
@@ -591,10 +584,7 @@ class TestPrettyExport:
         assert response.media_type == "application/json"
 
         content_disposition = response.headers["Content-Disposition"]
-        assert (
-            "test_export_with_special_chars.json" in content_disposition
-            or "test_export_with_special_chars_.json" in content_disposition
-        )
+        assert "test_export_with_special_chars.json" in content_disposition
 
         content = await self._get_csv_content(response)
         assert content == "[]"

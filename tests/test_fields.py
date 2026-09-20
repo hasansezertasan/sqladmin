@@ -1,13 +1,15 @@
+import enum
 from collections.abc import Generator
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import pytest
+from markupsafe import Markup
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
-from wtforms import Form
-from wtforms.validators import DataRequired
+from wtforms import Form, validators
+from wtforms.validators import DataRequired, Length
 
 from sqladmin.fields import (
     BooleanField,
@@ -229,6 +231,17 @@ def test_query_select_field() -> None:
     form.select._select_data = []
     assert form.validate() is False
 
+    # A callable get_label is applied to each label in iter_choices().
+    class F(Form):
+        select = QuerySelectField(
+            data=[("1", "alpha"), ("2", "beta")],
+            get_label=lambda label: label.upper(),
+        )
+
+    form = F()
+    assert [choice[1] for choice in form.select.iter_choices()] == ["ALPHA", "BETA"]
+    assert '<option value="1">ALPHA</option>' in form.select()
+
     class F(Form):  # type: ignore
         select = QuerySelectField(
             data=select_data,
@@ -338,6 +351,118 @@ def test_textarea_field() -> None:
     form = F()
     assert "autoresize-textarea" in form.text()
     assert "chars-count-label" in form.text()
+
+
+def test_textarea_field_without_chars_count() -> None:
+    class F(Form):
+        text = TextAreaField(show_chars_count=False)
+
+    form = F()
+    assert "autoresize-textarea" in form.text()
+    assert "chars-count-label" not in form.text()
+
+
+def test_textarea_field_without_autoresize() -> None:
+    class F(Form):
+        text = TextAreaField(enable_autoresize=False)
+
+    form = F()
+    assert "autoresize-textarea" not in form.text()
+    assert "chars-count-label" in form.text()
+
+
+def test_textarea_field_all_bool_false() -> None:
+    class F(Form):
+        text = TextAreaField(enable_autoresize=False, show_chars_count=False)
+
+    form = F()
+    assert "autoresize-textarea" not in form.text()
+    assert "chars-count-label" not in form.text()
+
+
+def test_textarea_field_with_validators() -> None:
+    class F(Form):
+        text = TextAreaField(validators=[DataRequired(), Length(min=1, max=100)])
+
+    form = F()
+    html = form.text()
+
+    assert len(form.text.validators) == 2
+    assert type(form.text.validators[0]) is DataRequired
+    assert type(form.text.validators[1]) is Length
+
+    # Validator flags must reach the rendered widget, not just the field.
+    assert "required" in html
+    assert 'minlength="1"' in html
+    assert 'maxlength="100"' in html
+
+
+def test_enum_field() -> None:
+    class MyEnum(enum.Enum):
+        first = "first"
+        second = "second"
+
+    class F(Form):
+        tuple_choices = SelectField(
+            choices=[(e.value, e.value) for e in MyEnum],
+            validators=[validators.AnyOf([(e.value, e.value) for e in MyEnum])],
+            coerce=lambda v: v.name if isinstance(v, enum.Enum) else str(v),
+        )
+        enum_choices = SelectField(
+            choices=[e for e in MyEnum],
+            validators=[validators.AnyOf([e for e in MyEnum])],
+            coerce=lambda v: v.name if isinstance(v, enum.Enum) else str(v),
+        )
+        else_choices = SelectField(
+            choices=[e.value for e in MyEnum],
+            validators=[validators.AnyOf([e.value for e in MyEnum])],
+            coerce=lambda v: v.name if isinstance(v, enum.Enum) else str(v),
+        )
+
+    form = F()
+
+    assert form.tuple_choices() == Markup(
+        '<select id="tuple_choices" name="tuple_choices">'
+        '<option value="first">first</option>'
+        '<option value="second">second</option>'
+        "</select>"
+    )
+
+    assert form.enum_choices() == Markup(
+        '<select id="enum_choices" name="enum_choices">'
+        '<option value="first">first</option>'
+        '<option value="second">second</option>'
+        "</select>"
+    )
+
+    assert form.else_choices() == Markup(
+        '<select id="else_choices" name="else_choices">'
+        '<option value="first">first</option>'
+        '<option value="second">second</option>'
+        "</select>"
+    )
+
+
+def test_enum_field_with_non_str_values() -> None:
+    class MyIntEnum(enum.IntEnum):
+        first = 1
+        second = 2
+
+    class F(Form):
+        enum_choices = SelectField(
+            choices=list(MyIntEnum),
+            coerce=lambda v: v.name if isinstance(v, enum.Enum) else str(v),
+        )
+
+    form = F()
+
+    # iter_choices() yields the raw Enum value; the widget stringifies it when
+    # rendering, so assert on the tuples to pin the actual contract.
+    assert [(c[0], c[1]) for c in form.enum_choices.iter_choices()] == [
+        (1, "first"),
+        (2, "second"),
+    ]
+    assert '<option value="1">first</option>' in form.enum_choices()
 
 
 @pytest.mark.parametrize(

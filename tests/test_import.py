@@ -6,7 +6,10 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from starlette.datastructures import MultiDict
 
 from sqladmin import ModelView
-from sqladmin._import import validate_import_row
+from sqladmin._import import (
+    validate_foreign_key_values,
+    validate_import_row,
+)
 from sqladmin.application import Admin
 from tests.common import sync_engine as engine
 
@@ -148,6 +151,46 @@ async def test_validate_import_row_reports_coercion_errors() -> None:
     assert merged == {"active": True}
     assert "profile_id" in errors
     assert "Invalid value" in errors["profile_id"][0]
+
+
+@pytest.mark.anyio
+async def test_import_value_error_coerce_column_value() -> None:
+    # row_data is built by hand, so the value reaches foreign_key_error_message
+    # uncoerced and fails when coerced against the Integer target column.
+    model_view = _model_view(ImportWidgetAdmin)
+    result = await validate_foreign_key_values(
+        model_view,
+        {
+            ImportWidget.id.key: 1,
+            ImportWidget.profile_id.key: "not-an-int",
+        },
+        {},
+    )
+    assert result == {
+        "profile_id": ["Invalid value 'not-an-int' for column profile_id."]
+    }
+
+
+@pytest.mark.anyio
+async def test_import_type_error_coerce_column_value(monkeypatch) -> None:
+    def mock_coerce_column_value(column: Column, value):
+        raise TypeError("error!")
+
+    monkeypatch.setattr(
+        "sqladmin._import.coerce_column_value", mock_coerce_column_value
+    )
+
+    model_view = _model_view(ImportWidgetAdmin)
+    result = await validate_foreign_key_values(
+        model_view,
+        {
+            ImportWidget.id.key: 1,
+            ImportWidget.active.key: True,
+            ImportWidget.profile_id.key: 1,
+        },
+        {},
+    )
+    assert result == {"profile_id": ["Invalid value 1 for column profile_id."]}
 
 
 class ImportWidgetRelationshipAdmin(ModelView, model=ImportWidget):

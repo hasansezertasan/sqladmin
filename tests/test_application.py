@@ -5,6 +5,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker
 from starlette.applications import Starlette
 from starlette.datastructures import MutableHeaders
+from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -393,3 +394,47 @@ def test_is_list_template_global():
     assert is_list(123) is False
     assert is_list(None) is False
     assert is_list({"key": "value"}) is False
+
+
+def test_application_http_exception_handler_raise_type_error():
+    app = Starlette()
+    admin = Admin(app=app, engine=engine)
+
+    # The built-in handler asserts it was given an HTTPException. Route a
+    # different exception type at it to reach that guard.
+    admin.admin.exception_handlers = {
+        ValueError: admin.admin.exception_handlers[HTTPException]
+    }
+
+    class UserAdmin(ModelView, model=User):
+        async def check_can_create(self, request: Request) -> bool:
+            raise ValueError("Error!")
+
+    admin.add_view(UserAdmin)
+
+    client = TestClient(app)
+
+    with pytest.raises(
+        TypeError, match="Expected HTTPException, got <class 'ValueError'>"
+    ):
+        client.get("/admin/user/create")
+
+
+def test_authentication_backend_is_none():
+    app = Starlette()
+    admin = Admin(app=app, engine=engine)
+
+    class UserAdmin(ModelView, model=User): ...
+
+    admin.add_view(UserAdmin)
+
+    client = TestClient(app)
+
+    response = client.get("/admin/login")
+    assert response.status_code == 503
+
+    response = client.post("/admin/login")
+    assert response.status_code == 503
+
+    response = client.get("/admin/logout")
+    assert response.status_code == 503
